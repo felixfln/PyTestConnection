@@ -1,4 +1,7 @@
 import speedtest
+import threading
+import time
+import psutil
 from .base import BaseEngine
 from ..utils.logger import logger
 
@@ -6,11 +9,42 @@ class SpeedtestEngine(BaseEngine):
     def get_name(self):
         return "Speedtest.net"
 
+    def _live_monitor(self, stop_event, callback, mode="download"):
+        """Monitora o tráfego real da rede durante o teste para o gráfico."""
+        try:
+            # Captura inicial
+            last_io = psutil.net_io_counters()
+            last_time = time.time()
+            
+            while not stop_event.is_set():
+                time.sleep(0.3) # Amostragem a cada 300ms
+                now = time.time()
+                io = psutil.net_io_counters()
+                
+                elapsed = now - last_time
+                if elapsed <= 0: continue
+                
+                if mode == "download":
+                    # Bytes recebidos (Convertendo para Mbps)
+                    diff = io.bytes_recv - last_io.bytes_recv
+                else:
+                    # Bytes enviados (Convertendo para Mbps)
+                    diff = io.bytes_sent - last_io.bytes_sent
+                
+                speed_mbps = (diff * 8) / (elapsed * 1_000_000)
+                
+                # Só envia se houver atividade relevante ou para manter a linha viva
+                if callback and speed_mbps > 0.1:
+                    callback(mode, speed_mbps)
+                
+                last_io = io
+                last_time = now
+        except Exception as e:
+            logger.warning(f"Live monitor falhou silenciosamente: {e}")
+
     def measure(self, callback=None):
         try:
-            # secure=True ajuda a evitar erros 403 em algumas redes
-            # timeout aumentado para 20s
-            logger.info("Inicializando cliente Speedtest.net (secure=True)")
+            logger.info("Inicializando cliente Speedtest.net (Ambiente Seguro)")
             st = speedtest.Speedtest(secure=True)
             
             if callback: callback("progress", 10)
@@ -20,42 +54,54 @@ class SpeedtestEngine(BaseEngine):
             if callback: callback("progress", 30)
             
             ping = st.results.ping
-            logger.info(f"Ping Speedtest: {ping}ms")
             if callback:
                 callback("ping", ping)
                 callback("progress", 40)
             
-            # Ponto inicial do gráfico
-            if callback: callback("download", 0)
-                
-            logger.info("Medindo Download...")
-            # threads=None usa o padrão da biblioteca
-            download = st.download() / 1_000_000  # Mbps
-            logger.info(f"Download: {download:.2f} Mbps")
+            # --- MEDIÇÃO DE DOWNLOAD COM MONITORAMENTO VIVO ---
+            logger.info("Iniciando Medição de Download (Live Monitoring)...")
+            stop_dl = threading.Event()
+            monitor_dl = threading.Thread(target=self._live_monitor, args=(stop_dl, callback, "download"))
+            monitor_dl.start()
+            
+            try:
+                # O st.download() já calcula a média estável interna
+                raw_download = st.download() / 1_000_000
+            finally:
+                stop_dl.set()
+                monitor_dl.join()
+
             if callback:
-                callback("download", download)
+                callback("download", raw_download) # Garante o ponto final oficial
                 callback("progress", 70)
                 
-            if callback: callback("upload", 0)
+            # --- MEDIÇÃO DE UPLOAD COM MONITORAMENTO VIVO ---
+            logger.info("Iniciando Medição de Upload (Live Monitoring)...")
+            stop_ul = threading.Event()
+            monitor_ul = threading.Thread(target=self._live_monitor, args=(stop_ul, callback, "upload"))
+            monitor_ul.start()
+            
+            try:
+                raw_upload = st.upload() / 1_000_000
+            finally:
+                stop_ul.set()
+                monitor_ul.join()
 
-            logger.info("Medindo Upload...")
-            upload = st.upload() / 1_000_000  # Mbps
-            logger.info(f"Upload: {upload:.2f} Mbps")
             if callback:
-                callback("upload", upload)
-                callback("progress", 90)
+                callback("upload", raw_upload) # Garante o ponto final oficial
+                callback("progress", 95)
             
             results = st.results.dict()
             return {
-                "download": download,
-                "upload": upload,
+                "download": raw_download,
+                "upload": raw_upload,
                 "ping": ping,
-                "jitter": 0, # Calculado no EngineManager
+                "jitter": 0,
                 "server": results["server"]["sponsor"],
                 "server_host": results["server"]["host"],
                 "ip": results["client"]["ip"],
                 "interface": results["client"]["isp"]
             }
         except Exception as e:
-            logger.error(f"Erro em SpeedtestEngine: {e}")
+            logger.error(f"Erro crítico no SpeedtestEngine: {e}")
             raise RuntimeError(f"SpeedtestEngine falhou: {e}")

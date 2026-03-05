@@ -6,17 +6,18 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 
 ## ✨ Funcionalidades Principais
 
-- **🚀 Medição em Tempo Real**: Visualize a velocidade de download e upload enquanto o teste acontece através de um gráfico dinâmico.
-- **🛡️ Alta Resiliência**: Sistema de failover inteligente que alterna entre diferentes provedores (Speedtest.net e PySpeedtest) caso um deles falhe.
-- **📊 Avaliação de Qualidade**: Algoritmo que atribui uma nota de 0 a 10 baseada em padrões de mercado para latência, velocidade e jitter.
-- **✅ Checklist de Cenários**: Saiba instantaneamente se sua internet é adequada para:
+- **🚀 Medição em Tempo Real**: Visualize a velocidade de download e upload enquanto o teste acontece através de um gráfico dinâmico de duas linhas.
+- **🛡️ Alta Resiliência**: Sistema de failover inteligente que alterna entre diferentes provedores caso um deles falhe.
+- **📊 Avaliação Premium (0-100)**: Algoritmo avançado que atribui uma pontuação granular e um status qualitativo (EXCELENTE, MUITO BOA, ESTÁVEL, LIMITADA ou INSTÁVEL).
+- **🚥 Semáforo de Capacidade**: Sistema de 3 níveis (Verde, Amarelo, Vermelho) para indicar a adequação da rede para:
   - Redes Sociais
   - Streaming HD e 4K
   - Videoconferências
-  - Jogos Online (Baixa Latência)
+  - Jogos Online (Baixa Latência/Jitter)
   - Downloads Pesados
-- **📑 Histórico Persistente**: Acompanhe o desempenho da sua rede ao longo do tempo com uma lista organizada e persistente.
-- **⚙️ Altamente Configurável**: Ajuste os limites de qualidade e requisitos de cenários através de um arquivo JSON simples.
+- **� Identificação de Provedor**: Mostra o nome do seu provedor de internet (ISP) e IP no painel.
+- **📑 Histórico Interativo**: Explore medições passadas clicando nos registros para recarregar o gráfico e métricas.
+- **📝 Logs por Sessão**: Sistema de auditoria que gera um arquivo único de log para cada inicialização em `logs/`.
 
 ---
 
@@ -25,10 +26,8 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 - **Python 3.14**: Linguagem base.
 - **Tkinter**: Interface gráfica nativa e leve.
 - **PyInstaller**: Para geração de executáveis Windows.
-- **Speedtest.net API**: Motor principal de medição.
-- **PySpeedtest**: Motor alternativo de reserva.
-
----
+- **Speedtest.net API (Secure)**: Motor principal de medição.
+- **ICMP Ping**: Medição real de Jitter através de pacotes sequenciais.
 
 ---
 
@@ -36,42 +35,35 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 
 ### Pré-requisitos
 - **Python 3.14**: Certifique-se de que o Python está instalado e adicionado ao seu PATH.
-- **Acesso à Internet**: Necessário para realizar os testes de velocidade e baixar as bibliotecas.
+- **Acesso à Internet**: Necessário para realizar os testes de velocidade.
 
 ### 📥 Passo 1: Instalação
 1. Abra o terminal (PowerShell ou Prompt de Comando) na pasta raiz do projeto.
-2. Crie e ative um ambiente virtual (opcional, mas recomendado):
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-3. Instale as dependências necessárias:
+2. Instale as dependências:
    ```bash
    pip install -r docs/requirements.txt
    ```
 
-### 🖥️ Passo 2: Utilização da Aplicação
-Para rodar o sistema diretamente via código:
+### 🖥️ Passo 2: Execução via Terminal
+Para rodar o sistema diretamente via código (estando na raiz do projeto):
 ```bash
-python src/main.py
+python -m src.main
 ```
+> **Nota**: O uso do `-m` garante que todos os módulos internos e o arquivo de versão sejam carregados corretamente.
+
 **Como usar na interface:**
-1. Clique em **"MEDIR AGORA"** para iniciar o teste.
-2. Acompanhe o **gráfico dinâmico** e as métricas em tempo real.
-3. Ao finalizar, veja sua **nota (0-10)** e o checklist de **adequação de uso**.
-4. O histórico será atualizado automaticamente na tabela inferior.
-5. Use o botão **"LIMPAR REGISTROS"** para resetar o histórico de medições.
+1. Clique em **"INICIAR AVALIAÇÃO"**.
+2. Acompanhe a **barra de progresso** e o gráfico em tempo real.
+3. Ao finalizar, veja sua **pontuação (0-100)** e os **LEDs coloridos** de adequação.
+4. Clique em qualquer linha do **Histórico** para ver os detalhes daquela medição específica.
 
 ### 📦 Passo 3: Criando o Executável (.exe)
-Se você deseja distribuir o programa para outras máquinas Windows sem a necessidade de instalar o Python:
+Para gerar o executável Windows:
 1. No terminal, execute:
    ```bash
    python build_exe.py
    ```
-2. Aguarde a finalização do processo.
-3. Vá até a pasta `dist/` recém-criada.
-4. Lá você encontrará o arquivo `PyTestConnection.exe`. 
-   - **Dica**: Você pode mover este arquivo para qualquer lugar e executá-lo. Ele já levará consigo as configurações padrão necessárias.
+2. O arquivo gerado estará em `dist/PyTestConnection.exe`.
 
 ---
 
@@ -80,27 +72,25 @@ Se você deseja distribuir o programa para outras máquinas Windows sem a necess
 ```text
 PyTestConnection/
 ├── config/
-│   └── metrics_config.json   # Regras de negócio e limites de nota
+│   └── metrics_config.json   # Rigor das avaliações e semáforo
 ├── data/
 │   └── data.txt             # Histórico de medições
-├── docs/
-│   └── requirements.txt     # Dependências do projeto
+├── logs/                    # Logs de execução (app_data_hora.log)
 ├── src/
-│   ├── engines/             # Lógica dos motores de medição (Adapter Pattern)
-│   ├── ui/                  # Componentes Tkinter e janelas
-│   └── utils/               # Persistência e cálculos matemáticos
-├── build_exe.py             # Script de automação do PyInstaller
-└── README.md                # Este documento
+│   ├── engines/             # Lógica de medição e Jitter
+│   ├── ui/                  # Interface e componentes gráficos
+│   └── utils/               # Logs, persistência e cálculos
+└── build_exe.py             # Script de automação do PyInstaller
 ```
 
 ---
 
 ## ⚙️ Configurações Customizadas
 
-Você pode alterar como as notas são calculadas editando o arquivo `config/metrics_config.json`. Lá você pode definir:
-- Faixas de velocidade para cada nota.
-- Latência máxima para cada nível de qualidade.
-- Requisitos mínimos de cada cenário de uso.
+Você pode calibrar o rigor do sistema em `config/metrics_config.json`. Lá você altera:
+- Limites para a pontuação 0-100.
+- Margens de tolerância para a cor Amarela do semáforo.
+- Requisitos mínimos de Download/Ping para cada cenário.
 
 ---
 

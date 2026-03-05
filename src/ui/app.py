@@ -92,7 +92,7 @@ class InternetQualityApp:
         header = tk.Frame(self.main_container, bg=COLORS["bg"])
         header.pack(fill=tk.X, pady=(0, 10))
         tk.Label(header, text="PYTEST", bg=COLORS["bg"], fg=COLORS["text"], font=("Segoe UI", 24, "bold")).pack(side=tk.LEFT)
-        tk.Label(header, text="CONEXÃO", bg=COLORS["bg"], fg=COLORS["accent"], font=("Segoe UI", 24, "bold")).pack(side=tk.LEFT, padx=5)
+        tk.Label(header, text="CONNECTION", bg=COLORS["bg"], fg=COLORS["accent"], font=("Segoe UI", 24, "bold")).pack(side=tk.LEFT, padx=5)
         
         # Progress
         self.progress = ttk.Progressbar(self.main_container, orient=tk.HORIZONTAL, mode='determinate', style="TProgressbar")
