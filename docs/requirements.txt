@@ -3,3 +3,4 @@ pyspeedtest
 requests
 matplotlib
 pyinstaller
+psutil

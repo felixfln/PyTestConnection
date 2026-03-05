@@ -106,3 +106,4 @@ Você pode alterar como as notas são calculadas editando o arquivo `config/metr
 
 ## 📝 Licença
 Desenvolvido como ferramenta de código aberto para medição de qualidade de rede.
+Por Felix Neto

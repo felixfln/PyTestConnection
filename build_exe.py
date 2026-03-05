@@ -18,6 +18,7 @@ def build():
         '--add-data=data;data',
         '--hidden-import=speedtest',
         '--hidden-import=pyspeedtest',
+        '--hidden-import=psutil',
         '--distpath=dist',
         '--workpath=build',
         '--clean'

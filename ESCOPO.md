@@ -47,4 +47,5 @@ quero uma aplicação completa, mas com um objetivo simples: Medir a qualidade d
     13.2) As dependências devem estar documentadas em `./docs/requirements.txt`.
     13.3) O projeto deve ser entregue pronto para uso, com estrutura de diretórios organizada.
 
-13.6) Teste se todas as funcionalidades implementadas estão funcionando corretamente.
+    13.6) Teste se todas as funcionalidades implementadas estão funcionando corretamente.
+    13.7) **Garantia de Instância Única**: A aplicação deve garantir que apenas uma instância seja executada por vez. Se uma nova for aberta, a anterior deve ser encerrada automaticamente.
