@@ -1,0 +1,52 @@
+{
+    "metrics": {
+        "download": {
+            "name": "Download",
+            "unit": "Mbps",
+            "thresholds": [
+                {"min": 0, "max": 10, "score": 2},
+                {"min": 10, "max": 50, "score": 5},
+                {"min": 50, "max": 100, "score": 8},
+                {"min": 100, "max": 10000, "score": 10}
+            ]
+        },
+        "upload": {
+            "name": "Upload",
+            "unit": "Mbps",
+            "thresholds": [
+                {"min": 0, "max": 5, "score": 2},
+                {"min": 5, "max": 20, "score": 5},
+                {"min": 20, "max": 50, "score": 8},
+                {"min": 50, "max": 10000, "score": 10}
+            ]
+        },
+        "ping": {
+            "name": "Ping",
+            "unit": "ms",
+            "thresholds": [
+                {"min": 0, "max": 20, "score": 10},
+                {"min": 20, "max": 50, "score": 8},
+                {"min": 50, "max": 100, "score": 5},
+                {"min": 100, "max": 10000, "score": 2}
+            ]
+        },
+        "jitter": {
+            "name": "Jitter",
+            "unit": "ms",
+            "thresholds": [
+                {"min": 0, "max": 5, "score": 10},
+                {"min": 5, "max": 15, "score": 8},
+                {"min": 15, "max": 30, "score": 5},
+                {"min": 30, "max": 10000, "score": 2}
+            ]
+        }
+    },
+    "scenarios": {
+        "social_media": {"min_score": 4, "min_download": 5},
+        "hd_streaming": {"min_score": 6, "min_download": 15},
+        "video_conference": {"min_score": 7, "min_ping": 60, "min_jitter": 20, "min_upload": 5},
+        "gaming": {"min_score": 8, "min_ping": 30, "min_jitter": 10},
+        "4k_streaming": {"min_score": 9, "min_download": 25},
+        "heavy_downloads": {"min_score": 7, "min_download": 100}
+    }
+}
