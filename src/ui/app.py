@@ -224,6 +224,7 @@ class InternetQualityApp:
                     self.root.after(0, lambda: self.graph.update_graph(ul_val=val))
                     self.root.after(0, lambda: self.lbl_upload.config(text=f"{val:.2f} Mbps"))
                 elif m_type == "ping": self.root.after(0, lambda: self.lbl_ping.config(text=f"Ping: {val:.2f} ms"))
+                elif m_type == "jitter": self.root.after(0, lambda: self.lbl_jitter.config(text=f"Jitter: {val:.2f} ms"))
                 elif m_type == "connection_type": self.root.after(0, lambda: self.lbl_connection_type.config(text=f"CONEXÃO: {val}"))
                 elif m_type == "interface": self.root.after(0, lambda: self.lbl_interface.config(text=f"ISP: {val}"))
                 elif m_type == "ip": self.root.after(0, lambda: self._update_ip_server(ip=val))

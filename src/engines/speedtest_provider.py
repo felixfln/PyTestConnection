@@ -68,7 +68,16 @@ class SpeedtestEngine(BaseEngine):
             ping = st.results.ping
             if callback:
                 callback("ping", ping)
-                callback("progress", 60)
+                callback("progress", 55)
+
+            # Jitter (Calculado logo após o ping como solicitado)
+            from ..utils.network import measure_jitter
+            server_host = results_init["server"]["host"]
+            if callback: callback("status", "Medindo estabilidade (Jitter)...")
+            jitter = measure_jitter(server_host)
+            if callback:
+                callback("jitter", jitter)
+                callback("progress", 65)
             
             # --- MEDIÇÃO DE DOWNLOAD COM MONITORAMENTO VIVO ---
             logger.info("Iniciando Medição de Download (Live Monitoring)...")
@@ -109,7 +118,7 @@ class SpeedtestEngine(BaseEngine):
                 "download": raw_download,
                 "upload": raw_upload,
                 "ping": ping,
-                "jitter": 0,
+                "jitter": jitter,
                 "server": results["server"]["sponsor"],
                 "server_host": results["server"]["host"],
                 "ip": results["client"]["ip"],

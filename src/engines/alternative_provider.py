@@ -26,11 +26,19 @@ class PySpeedtestEngine(BaseEngine):
                 callback("ping", ping)
                 callback("progress", 50)
             
+            # Jitter logo após o ping
+            from ..utils.network import measure_jitter
+            if callback: callback("status", "Medindo estabilidade (Jitter)...")
+            jitter = measure_jitter(st.host)
+            if callback:
+                callback("jitter", jitter)
+                callback("progress", 60)
+
             if callback: callback("status", "Medindo velocidade de DOWNLOAD...")
             download = st.download() / 1_000_000
             if callback:
                 callback("download", download)
-                callback("progress", 75)
+                callback("progress", 80)
             
             if callback: callback("status", "Medindo velocidade de UPLOAD...")
             upload = st.upload() / 1_000_000
@@ -42,7 +50,7 @@ class PySpeedtestEngine(BaseEngine):
                 "download": download,
                 "upload": upload,
                 "ping": ping,
-                "jitter": 0,
+                "jitter": jitter,
                 "server": st.host,
                 "server_host": st.host,
                 "ip": "Desconhecido",

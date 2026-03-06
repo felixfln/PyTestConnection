@@ -44,17 +44,6 @@ class EngineManager:
                 results = engine.measure(callback)
                 results["connection_type"] = connection_type # Preserva o que detectamos no início
                 
-                # Cálculo de Jitter
-                host = results.get("server_host")
-                if not host:
-                    server_url = results.get("server", "")
-                    host_match = re.search(r"https?://([^:/]+)", server_url)
-                    host = host_match.group(1) if host_match else "8.8.8.8"
-
-                if callback: callback("status", "Finalizando: Calculando estabilidade (Jitter)...")
-                jitter = self._measure_jitter(host)
-                results["jitter"] = jitter
-                
                 if callback: 
                     callback("progress", 100)
                     callback("status", "Teste finalizado.")
@@ -191,42 +180,3 @@ class EngineManager:
             logger.debug(f"Erro ao detectar tipo de conexão: {e}")
             return "--"
 
-    def _measure_jitter(self, host: str) -> float:
-        """Calcula jitter baseado em pings reais (Variação média entre latências sucessivas)"""
-        latencies: List[float] = []
-        try:
-            # Remove porta do host se houver (ex: host.com:8080 -> host.com)
-            clean_host = host.split(":")[0]
-            
-            param = "-n" if platform.system().lower() == "windows" else "-c"
-            # 8 pings para uma amostragem melhor sem demorar muito
-            command = ["ping", param, "8", clean_host]
-            
-            # Executa ping ocultando janela no Windows
-            flags = 0x08000000 if platform.system() == "Windows" else 0
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=flags)
-            stdout, stderr = process.communicate()
-            
-            if process.returncode != 0:
-                logger.warning(f"Comando ping retornou erro {process.returncode} para {clean_host}: {stderr}")
-                return 0.0
-
-            # Regex aprimorado para capturar latência em PT e EN
-            matches = re.findall(r"(?:tempo|time)[=<]\s*(\d+\.?\d*)", stdout, re.IGNORECASE)
-            latencies = [float(m) for m in matches]
-            
-            logger.info(f"Pings realizados para {clean_host}: {latencies}")
-
-            if len(latencies) < 2:
-                logger.warning(f"Poucos pacotes retornados para cálculo de jitter do host {clean_host}")
-                return 0.0
-                
-            # Jitter = Média das diferenças absolutas entre pings consecutivos
-            diffs = [abs(latencies[i] - latencies[i-1]) for i in range(1, len(latencies))]
-            jitter = sum(diffs) / len(diffs)
-            # Ensure result is a float rounded to 2 decimal places
-            return float(int(jitter * 100) / 100.0)
-            
-        except Exception as e:
-            logger.error(f"Exceção durante cálculo de jitter: {e}")
-            return 0.0
