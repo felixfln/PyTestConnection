@@ -9,21 +9,30 @@ class PySpeedtestEngine(BaseEngine):
     def measure(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
         """Implementação simplificada usando pyspeedtest do PyPI"""
         try:
+            if callback: callback("status", "Preparando motor PySpeedtest...")
             st = pyspeedtest.SpeedTest()
             
-            if callback: callback("progress", 10)
+            if callback: 
+                callback("progress", 30)
+                callback("status", "Localizando servidor secundário...")
+                callback("server", st.host)
+                callback("interface", "Automático")
+                callback("ip", "Calculando...")
+                callback("progress", 40)
+
+            if callback: callback("status", "Medindo latência (Ping)...")
             ping = st.ping()
             if callback:
                 callback("ping", ping)
-                callback("progress", 30)
+                callback("progress", 50)
             
-            if callback: callback("download", 0)
+            if callback: callback("status", "Medindo velocidade de DOWNLOAD...")
             download = st.download() / 1_000_000
             if callback:
                 callback("download", download)
-                callback("progress", 70)
+                callback("progress", 75)
             
-            if callback: callback("upload", 0)
+            if callback: callback("status", "Medindo velocidade de UPLOAD...")
             upload = st.upload() / 1_000_000
             if callback:
                 callback("upload", upload)

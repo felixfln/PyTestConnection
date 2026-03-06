@@ -1,7 +1,7 @@
 import os
 import sys
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # Caminhos de Arquivos
 DATA_FILE = "data/data.txt"

@@ -46,38 +46,50 @@ class SpeedtestEngine(BaseEngine):
     def measure(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
         try:
             logger.info("Inicializando cliente Speedtest.net (Ambiente Seguro)")
+            if callback: callback("status", "Preparando motor Speedtest.net...")
             st = speedtest.Speedtest(secure=True)
-            
-            if callback: callback("progress", 10)
-            
-            logger.info("Buscando melhor servidor...")
-            st.get_best_server()
             if callback: callback("progress", 30)
             
+            logger.info("Buscando melhor servidor...")
+            if callback: callback("status", "Localizando servidor de teste ideal...")
+            st.get_best_server()
+            if callback: callback("progress", 40)
+            
+            # Captura metadados
+            results_init = st.results.dict()
+            if callback:
+                callback("interface", results_init["client"]["isp"])
+                callback("ip", results_init["client"]["ip"])
+                callback("server", results_init["server"]["sponsor"])
+                callback("progress", 50)
+
+            # Latência
+            if callback: callback("status", "Medindo latência (Ping)...")
             ping = st.results.ping
             if callback:
                 callback("ping", ping)
-                callback("progress", 40)
+                callback("progress", 60)
             
             # --- MEDIÇÃO DE DOWNLOAD COM MONITORAMENTO VIVO ---
             logger.info("Iniciando Medição de Download (Live Monitoring)...")
+            if callback: callback("status", "Medindo velocidade de DOWNLOAD...")
             stop_dl = threading.Event()
             monitor_dl = threading.Thread(target=self._live_monitor, args=(stop_dl, callback, "download"))
             monitor_dl.start()
             
             try:
-                # O st.download() já calcula a média estável interna
                 raw_download = st.download() / 1_000_000
             finally:
                 stop_dl.set()
                 monitor_dl.join()
 
             if callback:
-                callback("download", raw_download) # Garante o ponto final oficial
-                callback("progress", 70)
+                callback("download", raw_download)
+                callback("progress", 80)
                 
             # --- MEDIÇÃO DE UPLOAD COM MONITORAMENTO VIVO ---
             logger.info("Iniciando Medição de Upload (Live Monitoring)...")
+            if callback: callback("status", "Medindo velocidade de UPLOAD...")
             stop_ul = threading.Event()
             monitor_ul = threading.Thread(target=self._live_monitor, args=(stop_ul, callback, "upload"))
             monitor_ul.start()
@@ -89,7 +101,7 @@ class SpeedtestEngine(BaseEngine):
                 monitor_ul.join()
 
             if callback:
-                callback("upload", raw_upload) # Garante o ponto final oficial
+                callback("upload", raw_upload)
                 callback("progress", 95)
             
             results = st.results.dict()

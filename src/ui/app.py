@@ -57,6 +57,7 @@ class InternetQualityApp:
         self.persistence = PersistenceManager()
         self.calculator = QualityCalculator()
         self.current_records = []
+        self.is_measuring = False
 
         self._apply_theme()
         self._setup_main_scroll()
@@ -206,6 +207,7 @@ class InternetQualityApp:
         self._clear_ui() # Resetar tudo antes de começar, como solicitado
         self.btn_measure.config(state="disabled")
         self.btn_clear.config(state="disabled")
+        self.is_measuring = True
         self.progress['value'] = 0
         self.lbl_status.config(text="Avaliando conexão...")
         threading.Thread(target=self._measurement_task, daemon=True).start()
@@ -214,6 +216,7 @@ class InternetQualityApp:
         try:
             def callback(m_type: str, val: Any) -> None:
                 if m_type == "progress": self.root.after(0, lambda: self.progress.config(value=val))
+                elif m_type == "status": self.root.after(0, lambda: self.lbl_status.config(text=val))
                 elif m_type == "download":
                     self.root.after(0, lambda: self.graph.update_graph(dl_val=val))
                     self.root.after(0, lambda: self.lbl_download.config(text=f"{val:.2f} Mbps"))
@@ -221,6 +224,10 @@ class InternetQualityApp:
                     self.root.after(0, lambda: self.graph.update_graph(ul_val=val))
                     self.root.after(0, lambda: self.lbl_upload.config(text=f"{val:.2f} Mbps"))
                 elif m_type == "ping": self.root.after(0, lambda: self.lbl_ping.config(text=f"Ping: {val:.2f} ms"))
+                elif m_type == "connection_type": self.root.after(0, lambda: self.lbl_connection_type.config(text=f"CONEXÃO: {val}"))
+                elif m_type == "interface": self.root.after(0, lambda: self.lbl_interface.config(text=f"ISP: {val}"))
+                elif m_type == "ip": self.root.after(0, lambda: self._update_ip_server(ip=val))
+                elif m_type == "server": self.root.after(0, lambda: self._update_ip_server(server=val))
 
             results = self.engine_manager.run_measurement(callback=callback)
             score = self.calculator.calculate_score(results)
@@ -243,6 +250,7 @@ class InternetQualityApp:
             logger.error(f"Erro durante tarefa de medição: {e}")
             self.root.after(0, lambda: messagebox.showerror("Erro de Rede", str(e)))
         finally:
+            self.is_measuring = False
             self.root.after(0, lambda: [self.btn_measure.config(state="normal"), self.btn_clear.config(state="normal"), self.lbl_status.config(text="Teste finalizado")])
 
     def _update_ui(self, res: Dict[str, Any], score: Union[int, str], scen: Dict[str, int]) -> None:
@@ -267,6 +275,35 @@ class InternetQualityApp:
         
         self.lbl_ip_server.config(text=f"IP: {res.get('ip', '--')} | Servidor: {res.get('server', '--')}")
         
+    def _update_ip_server(self, ip: Optional[str] = None, server: Optional[str] = None) -> None:
+        current = self.lbl_ip_server.cget("text")
+        # Formato: "IP: -- | Servidor: --"
+        parts = current.split(" | ")
+        curr_ip = parts[0].replace("IP: ", "") if len(parts) > 0 else "--"
+        curr_server = parts[1].replace("Servidor: ", "") if len(parts) > 1 else "--"
+        
+        new_ip = ip if ip else curr_ip
+        new_server = server if server else curr_server
+        self.lbl_ip_server.config(text=f"IP: {new_ip} | Servidor: {new_server}")
+
+    def _update_ui(self, res: Dict[str, Any], score: Union[int, str], scen: Dict[str, int]) -> None:
+        # Mapeamento de cor e adjetivo
+        score_val = int(score) if str(score).isdigit() else 0
+        if score_val >= 95: text, color = "EXCELENTE", COLORS["success"]
+        elif score_val >= 80: text, color = "MUITO BOA", COLORS["accent"]
+        elif score_val >= 60: text, color = "ESTÁVEL", "#94a3b8"
+        elif score_val >= 40: text, color = "LIMITADA", COLORS["ul"]
+        else: text, color = "INSTÁVEL", COLORS["error"]
+
+        self.lbl_download.config(text=f"{res['download']:.2f} Mbps")
+        self.lbl_upload.config(text=f"{res['upload']:.2f} Mbps")
+        self.lbl_ping.config(text=f"Ping: {res['ping']:.2f} ms")
+        self.lbl_jitter.config(text=f"Jitter: {res.get('jitter', 0):.2f} ms")
+        self.lbl_grade.config(text=str(score), fg=color)
+        self.lbl_interface.config(text=f"STATUS: {text} | ISP: {res.get('interface', '--')}", fg=color)
+        self.lbl_connection_type.config(text=f"CONEXÃO: {res.get('connection_type', '--')}")
+        self.lbl_ip_server.config(text=f"IP: {res.get('ip', '--')} | Servidor: {res.get('server', '--')}")
+
         for k, v in scen.items():
             if k in self.adequacy_items:
                 level = int(v) if str(v).isdigit() else 0
@@ -280,6 +317,9 @@ class InternetQualityApp:
             self.tree.insert("", tk.END, iid=str(i), values=vals)
 
     def _on_tree_select(self, event):
+        if self.is_measuring:
+            self.tree.selection_set(())
+            return
         sel = self.tree.selection()
         if not sel: return
         r = self.current_records[int(sel[0])]

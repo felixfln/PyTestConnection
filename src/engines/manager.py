@@ -24,31 +24,41 @@ class EngineManager:
             logger.error(f"Erro ao carregar PySpeedtestEngine: {e}")
 
     def run_measurement(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
+        if callback: 
+            callback("status", "Iniciando avaliação sobre a qualidade da internet...")
+            callback("progress", 5)
+            
+        # 1. Detecta tipo de conexão LOGO NO INÍCIO
+        if callback: callback("status", "Obtendo informações sobre sua conexão...")
+        connection_type = self._get_connection_type()
+        if callback: 
+            callback("connection_type", connection_type)
+            callback("progress", 10)
+
         error_messages = []
         for engine in self.engines:
             try:
                 engine_name = engine.get_name()
-                logger.info(f"Tentando medição com {engine_name}...")
+                if callback: callback("status", f"Preparando motores de medição ({engine_name})...")
+                
                 results = engine.measure(callback)
+                results["connection_type"] = connection_type # Preserva o que detectamos no início
                 
-                if callback: callback("progress", 90)
-                
-                # Realiza medição de jitter baseada no host do servidor
+                # Cálculo de Jitter
                 host = results.get("server_host")
                 if not host:
-                    # Tenta extrair host da URL se existir (ex: http://servidor.com:8080/speedtest/upload.php)
                     server_url = results.get("server", "")
                     host_match = re.search(r"https?://([^:/]+)", server_url)
                     host = host_match.group(1) if host_match else "8.8.8.8"
 
-                logger.info(f"Iniciando cálculo de jitter para o host: {host}")
+                if callback: callback("status", "Finalizando: Calculando estabilidade (Jitter)...")
                 jitter = self._measure_jitter(host)
                 results["jitter"] = jitter
                 
-                # Detecta tipo de conexão
-                results["connection_type"] = self._get_connection_type()
+                if callback: 
+                    callback("progress", 100)
+                    callback("status", "Teste finalizado.")
                 
-                if callback: callback("progress", 100)
                 logger.info(f"Medição concluída com sucesso via {engine_name}")
                 return results
             except Exception as e:
@@ -62,105 +72,122 @@ class EngineManager:
         raise RuntimeError(final_error)
 
     def _get_connection_type(self) -> str:
-        """Tenta detectar o tipo de conexão com detalhes (Wi-Fi 2.4/5GHz, Cabo, Mobile)"""
+        """Tenta detectar o tipo de conexão ativa usando critérios precisos do Windows."""
         if platform.system() != "Windows":
             return "--"
             
         try:
             flags = 0x08000000 # CREATE_NO_WINDOW
             
-            # 1. Tenta obter detalhes do Wi-Fi via netsh (mais preciso para bandas)
-            stdout_wlan = ""
+            # 1. Identifica a interface ativa via PowerShell (Rota Padrão 0.0.0.0/0)
+            stdout_active = ""
             try:
-                process = subprocess.Popen(["netsh", "wlan", "show", "interfaces"], 
-                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                          text=True, creationflags=flags)
-                stdout_wlan, _ = process.communicate()
-            except: pass
-
-            # 2. Obtém detalhes de todos os adaptadores FÍSICOS ativos via PowerShell
-            stdout_ps = ""
-            try:
-                # Pegamos todos os adaptadores físicos que estão Up para análise
-                ps_cmd = 'Get-NetAdapter | Where-Object { $_.Status -eq "Up" -and $_.Virtual -eq $false } | Select-Object Name, InterfaceDescription, MediaType, PhysicalMediaType, NdisPhysicalMedium | ConvertTo-Json'
+                # Comando PS para pegar o adaptador físico da rota principal
+                ps_cmd = (
+                    '$rt = Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Sort-Object RouteMetric | Select-Object -First 1; '
+                    'if($rt) { Get-NetAdapter -InterfaceIndex $rt.InterfaceIndex | '
+                    'Select-Object Name, InterfaceDescription, MediaType, LinkSpeed | ConvertTo-Json }'
+                )
                 process = subprocess.Popen(["powershell", "-Command", ps_cmd], 
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
                                           text=True, creationflags=flags)
-                stdout_ps, _ = process.communicate()
+                stdout_active, _ = process.communicate()
             except: pass
 
-            # Parse do JSON do PowerShell
-            adapters = []
-            if stdout_ps.strip():
+            active_adapter = {}
+            if stdout_active.strip():
                 try:
                     import json
-                    data = json.loads(stdout_ps)
-                    adapters = data if isinstance(data, list) else [data]
+                    active_adapter = json.loads(stdout_active)
+                    if isinstance(active_adapter, list): active_adapter = active_adapter[0]
                 except: pass
 
-            # Se não achou adaptadores físicos ativos, retorna desconhecido
-            if not adapters and not stdout_wlan:
-                return "--"
+            # 2. Se for Wi-Fi ou detectado como tal, detalhamos via netsh
+            is_wifi = False
+            if active_adapter:
+                media = str(active_adapter.get("MediaType", "")).lower()
+                name = str(active_adapter.get("Name", "")).lower()
+                if "802.11" in media or "wi-fi" in name or "wireless" in name:
+                    is_wifi = True
 
-            # 3. Lógica de decisão (Prioriza o que tem mais chance de ser a conexão principal)
-            
-            # Verifica Wi-Fi primeiro (netsh)
-            if "State" in stdout_wlan and ("connected" in stdout_wlan or "conectado" in stdout_wlan):
-                band = ""
-                # Detecção de Banda por Canal
-                chan_match = re.search(r"(?:Canal|Channel)\s*:\s*(\d+)", stdout_wlan)
-                if chan_match:
-                    channel = int(channel_val := int(chan_match.group(1)))
-                    if channel <= 14: band = " 2.4GHz"
-                    elif 32 <= channel <= 177: band = " 5GHz"
-                    elif channel >= 180: band = " 6GHz"
-                
-                # Detecção de Banda por Tipo de Rádio (Fallback)
-                if not band:
+            if is_wifi:
+                try:
+                    process = subprocess.Popen(["netsh", "wlan", "show", "interfaces"], 
+                                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+                                              text=True, creationflags=flags)
+                    stdout_wlan, _ = process.communicate()
+                    
+                    band = ""
+                    # 1. Detecção por Canal (Netsh)
+                    chan_match = re.search(r"(?:Canal|Channel)\s*:\s*(\d+)", stdout_wlan)
+                    if chan_match:
+                        channel = int(chan_match.group(1))
+                        if 1 <= channel <= 14: band = " 2.4GHz"
+                        elif 32 <= channel <= 177: band = " 5GHz"
+                        elif channel >= 180: band = " 6GHz"
+                    
+                    # 2. Detecção por PhysicalMediaType ou Radio Type (Fallback)
+                    phys_media = str(active_adapter.get("PhysicalMediaType", "")).lower()
                     radio_match = re.search(r"(?:Radio type|Tipo de rádio)\s*:\s*([^\r\n]*)", stdout_wlan)
-                    if radio_match:
-                        radio = radio_match.group(1).lower()
-                        if "802.11be" in radio: band = " 6GHz"
-                        elif "802.11ax" in radio or "802.11ac" in radio: band = " 5GHz"
-                        elif "802.11n" in radio: band = " (2.4/5GHz)"
-                        elif "802.11g" in radio or "802.11b" in radio: band = " 2.4GHz"
+                    radio = radio_match.group(1).lower() if radio_match else phys_media
+                    
+                    if not band and radio:
+                        if any(x in radio for x in ["802.11be", "6ghz"]): band = " 6GHz"
+                        elif any(x in radio for x in ["802.11ax", "802.11ac", "5ghz"]): band = " 5GHz"
+                        elif "802.11n" in radio: 
+                            speed_val = str(active_adapter.get("LinkSpeed", "0")).lower()
+                            try:
+                                speed_num = float(speed_val.split()[0].replace(',', '.'))
+                                if "gbps" in speed_val or speed_num > 300: band = " 5GHz"
+                                else: band = " 2.4GHz"
+                            except: band = " 2.4GHz"
+                        elif any(x in radio for x in ["802.11g", "802.11b", "2.4ghz"]): band = " 2.4GHz"
+                    
+                    # 3. Fallback Final por Velocidade (Se nada acima funcionar)
+                    if not band:
+                        speed_val = str(active_adapter.get("LinkSpeed", "0")).lower()
+                        try:
+                            speed_num = float(speed_val.split()[0].replace(',', '.'))
+                            if "gbps" in speed_val or speed_num >= 300: band = " 5GHz"
+                            else: band = " 2.4GHz"
+                        except: band = " 2.4GHz"
 
-                # Tenta extrair o SSID para ver se é hotspot
-                ssid = ""
-                ssid_match = re.search(r"SSID\s*:\s*([^\r\n]*)", stdout_wlan)
-                if ssid_match:
-                    ssid = ssid_match.group(1).strip().lower()
+                    ssid_match = re.search(r"SSID\s*:\s*([^\r\n]*)", stdout_wlan)
+                    ssid = ssid_match.group(1).strip().lower() if ssid_match else ""
+                    desc = str(active_adapter.get("InterfaceDescription", "")).lower()
+                    
+                    mobile_hints = ["iphone", "android", "galaxy", "motorola", "hotspot", "móvel", "mobile", "tether", "roteado"]
+                    if any(hint in ssid for hint in mobile_hints) or any(hint in desc for hint in mobile_hints):
+                        prefix = "Wi-Fi (Smartphone)" if any(x in desc for x in ["apple", "android"]) or any(x in ssid for x in ["iphone", "android"]) else "Wi-Fi Móvel"
+                        return f"{prefix}{band}"
+                    
+                    return f"Wi-Fi{band}"
+                except:
+                    return "Wi-Fi"
 
-                # Verifica se é Hotspot de Celular pelo nome da rede ou descrição do hardware
-                desc_lower = stdout_wlan.lower()
-                mobile_hints = ["iphone", "android", "galaxy", "motorola", "xiaomi", "redmi", "huawei", "hotspot", "móvel", "mobile"]
-                if any(hint in ssid for hint in mobile_hints) or any(hint in desc_lower for hint in mobile_hints):
-                    return f"Wi-Fi Móvel{band}"
+            # 3. Heurística para Ethernet e Outros
+            if active_adapter:
+                desc = str(active_adapter.get("InterfaceDescription", "")).lower()
+                name = str(active_adapter.get("Name", "")).lower()
+                media = str(active_adapter.get("MediaType", "")).lower()
                 
-                return f"Wi-Fi{band}"
-
-            # Verifica outros adaptadores (Ethernet / Móvel USB)
-            for adapter in adapters:
-                desc = str(adapter.get("InterfaceDescription", "")).lower()
-                name = str(adapter.get("Name", "")).lower()
-                media_type = str(adapter.get("MediaType", "")).lower()
-                
-                # Detecção de Internet Móvel (USB Tethering ou Modem Interno)
-                mobile_keywords = ["remote ndis", "cellular", "móvel", "wwan", "tethering", "apple mobile", "samsung mobile"]
+                # Mobile tethering via USB (Remote NDIS)
+                mobile_keywords = ["remote ndis", "cellular", "wwan", "tethering", "apple mobile", "samsung mobile"]
                 if any(kw in desc or kw in name for kw in mobile_keywords):
                     return "Internet Móvel (USB/Modem)"
                 
-                # Detecção de Cabo (Ethernet)
-                if "802.3" in media_type or "ethernet" in media_type or "lan" in desc:
-                    # Dica de Fibra/Cabo (Muito difícil via software, mas podemos sugerir se for GigaEthernet)
-                    if "gigabit" in desc or "gbe" in desc or "1000" in desc:
+                # Ethernet/Cabo
+                if "802.3" in media or "ethernet" in media or "lan" in desc or "cabo" in name:
+                    speed = str(active_adapter.get("LinkSpeed", ""))
+                    if "Gbps" in speed or "1000" in speed or "gigabit" in desc:
                         return "Cabo (Giga Ethernet)"
                     return "Cabo (Ethernet)"
 
-            return "Conexão Local" if adapters else "--"
+                return name[:15] if name else "Conexão Ativa"
+
+            return "--"
             
         except Exception as e:
-            # Tolerante a falhas: se algo der errado, apenas retorna o básico ou vazio
             logger.debug(f"Erro ao detectar tipo de conexão: {e}")
             return "--"
 
