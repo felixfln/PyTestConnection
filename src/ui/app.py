@@ -4,32 +4,52 @@ import threading
 from datetime import datetime
 import os
 import sys
+from typing import Dict, Any, List, Optional, Callable, Union
+
 from ..engines.manager import EngineManager
 from ..utils.persistence import PersistenceManager
 from ..utils.calculator import QualityCalculator
 from ..utils.logger import logger
-from ..version import VERSION
 from .components.graph import DynamicGraph
+from ..constants import COLORS, VERSION, APP_TITLE, WINDOW_SIZE, SEMAPHORE_COLORS
 
-# Paleta de Cores Premium
-COLORS = {
-    "bg": "#0f172a",
-    "card": "#1e293b",
-    "accent": "#22d3ee",
-    "accent_dim": "#0891b2",
-    "ul": "#fbbf24",       # Âmbar (Usada para status intermediário)
-    "amber": "#fbbf24",    # Alias para legibilidade
-    "text": "#f8fafc",
-    "text_dim": "#94a3b8",
-    "success": "#4ade80",
-    "error": "#f43f5e",
-}
+
+# Módulo da Interface Principal
 
 class InternetQualityApp:
-    def __init__(self, root):
+    # Class-level type hints for attributes
+    root: tk.Tk
+    engine_manager: EngineManager
+    persistence: PersistenceManager
+    calculator: QualityCalculator
+    current_records: List[Dict[str, Any]]
+    is_measuring: bool
+    
+    # UI Components
+    canvas: tk.Canvas
+    scrollbar: ttk.Scrollbar
+    scrollable_frame: tk.Frame
+    main_container: tk.Frame
+    progress: ttk.Progressbar
+    lbl_status: tk.Label
+    lbl_download: tk.Label
+    lbl_upload: tk.Label
+    lbl_ping: tk.Label
+    lbl_jitter: tk.Label
+    lbl_grade: tk.Label
+    lbl_interface: tk.Label
+    lbl_connection_type: tk.Label
+    lbl_ip_server: tk.Label
+    graph: DynamicGraph
+    btn_measure: tk.Button
+    btn_clear: tk.Button
+    tree: ttk.Treeview
+    adequacy_items: Dict[str, tk.Label]
+
+    def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title(f"PyTestConnection v{VERSION}")
-        self.root.geometry("1100x950")
+        self.root.title(APP_TITLE)
+        self.root.geometry(WINDOW_SIZE)
         self.root.configure(bg=COLORS["bg"])
 
         logger.info("Iniciando aplicação PyTestConnection")
@@ -43,7 +63,7 @@ class InternetQualityApp:
         self._create_widgets()
         self._load_history()
 
-    def _apply_theme(self):
+    def _apply_theme(self) -> None:
         style = ttk.Style()
         style.theme_use('clam')
         style.configure("TFrame", background=COLORS["bg"])
@@ -64,7 +84,7 @@ class InternetQualityApp:
                         borderwidth=0)
         style.map("Treeview", background=[('selected', COLORS["accent_dim"])])
 
-    def _setup_main_scroll(self):
+    def _setup_main_scroll(self) -> None:
         self.canvas = tk.Canvas(self.root, bg=COLORS["bg"], highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.canvas.yview, style="Vertical.TScrollbar")
         self.scrollable_frame = tk.Frame(self.canvas, bg=COLORS["bg"])
@@ -84,7 +104,7 @@ class InternetQualityApp:
         # Mouse wheel
         self.canvas.bind_all("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         self.main_container = tk.Frame(self.scrollable_frame, bg=COLORS["bg"])
         self.main_container.pack(fill=tk.BOTH, expand=True, padx=30, pady=20)
 
@@ -133,6 +153,8 @@ class InternetQualityApp:
         self.lbl_grade.pack()
         self.lbl_interface = tk.Label(right, text="Interface: --", bg=COLORS["card"], fg=COLORS["text_dim"], font=("Segoe UI", 9))
         self.lbl_interface.pack()
+        self.lbl_connection_type = tk.Label(right, text="Conexão: --", bg=COLORS["card"], fg=COLORS["text_dim"], font=("Segoe UI", 9))
+        self.lbl_connection_type.pack()
         self.lbl_ip_server = tk.Label(right, text="IP: -- | Servidor: --", bg=COLORS["card"], fg="#64748b", font=("Segoe UI", 8))
         self.lbl_ip_server.pack(pady=(5, 0))
 
@@ -168,29 +190,29 @@ class InternetQualityApp:
         self.table_cols = [
             ("Data", "DATA"), ("Hora", "HORA"), ("Download", "DOWNLOAD"), 
             ("Upload", "UPLOAD"), ("Ping", "PING"), ("Jitter", "JITTER"), 
-            ("Interface", "PROVEDOR"), ("Nota", "NOTA")
+            ("Interface", "PROVEDOR"), ("Conexão", "CONEXÃO"), ("Nota", "NOTA")
         ]
         cols = [c[0] for c in self.table_cols]
         self.tree = ttk.Treeview(self.main_container, columns=cols, show="headings", style="Treeview", height=8)
         for col, head in self.table_cols:
             self.tree.heading(col, text=head)
             self.tree.column(col, width=90, anchor="center")
-        self.tree.column("Interface", width=150) # Dar mais espaço ao provedor
+        self.tree.column("Interface", width=120)
+        self.tree.column("Conexão", width=120)
         self.tree.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-    def _start_measurement(self):
+    def _start_measurement(self) -> None:
+        self._clear_ui() # Resetar tudo antes de começar, como solicitado
         self.btn_measure.config(state="disabled")
         self.btn_clear.config(state="disabled")
         self.progress['value'] = 0
         self.lbl_status.config(text="Avaliando conexão...")
-        self.graph.clear()
-        self.graph.update_graph(dl_val=0, ul_val=0)
         threading.Thread(target=self._measurement_task, daemon=True).start()
 
-    def _measurement_task(self):
+    def _measurement_task(self) -> None:
         try:
-            def callback(m_type, val):
+            def callback(m_type: str, val: Any) -> None:
                 if m_type == "progress": self.root.after(0, lambda: self.progress.config(value=val))
                 elif m_type == "download":
                     self.root.after(0, lambda: self.graph.update_graph(dl_val=val))
@@ -207,11 +229,12 @@ class InternetQualityApp:
             self.root.after(0, lambda: self._update_ui(results, score, scenarios))
             
             now = datetime.now()
-            record = {
+            record: Dict[str, Any] = {
                 "date": now.strftime("%d/%m/%Y"), "time": now.strftime("%H:%M:%S"),
                 "download": results["download"], "upload": results["upload"],
                 "ping": results["ping"], "jitter": results.get("jitter", 0),
                 "server": results["server"], "interface": results.get("interface", "--"),
+                "connection_type": results.get("connection_type", "--"),
                 "ip": results.get("ip", "--"), "grade": score, **scenarios
             }
             self.persistence.save_record(record)
@@ -222,7 +245,7 @@ class InternetQualityApp:
         finally:
             self.root.after(0, lambda: [self.btn_measure.config(state="normal"), self.btn_clear.config(state="normal"), self.lbl_status.config(text="Teste finalizado")])
 
-    def _update_ui(self, res, score, scen):
+    def _update_ui(self, res: Dict[str, Any], score: Union[int, str], scen: Dict[str, int]) -> None:
         # Mapeamento de cor e adjetivo baseado na pontuação 0-100
         score_val = int(score) if str(score).isdigit() else 0
         if score_val >= 95: text, color = "EXCELENTE", COLORS["success"]
@@ -239,23 +262,15 @@ class InternetQualityApp:
         self.lbl_jitter.config(text=f"Jitter: {jit:.2f} ms" if jit > 0 else "Jitter: --")
         
         self.lbl_grade.config(text=str(score), fg=color)
-        # Adicionar o adjetivo pequeno abaixo da nota (reaproveitando lbl_interface ou adicionando contexto)
         self.lbl_interface.config(text=f"STATUS: {text} | ISP: {res.get('interface', '--')}", fg=color)
+        self.lbl_connection_type.config(text=f"CONEXÃO: {res.get('connection_type', '--')}")
         
         self.lbl_ip_server.config(text=f"IP: {res.get('ip', '--')} | Servidor: {res.get('server', '--')}")
         
-        # Mapeamento do Semáforo (0=Red, 1=Yellow/Amber, 2=Green)
-        semaphore_colors = {
-            0: COLORS["error"],
-            1: COLORS["amber"],
-            2: COLORS["success"]
-        }
-        
         for k, v in scen.items():
             if k in self.adequacy_items:
-                # v agora pode ser 0, 1 ou 2
                 level = int(v) if str(v).isdigit() else 0
-                self.adequacy_items[k].config(fg=semaphore_colors.get(level, COLORS["error"]))
+                self.adequacy_items[k].config(fg=SEMAPHORE_COLORS.get(level, COLORS["error"]))
 
     def _load_history(self):
         for item in self.tree.get_children(): self.tree.delete(item)
@@ -272,7 +287,8 @@ class InternetQualityApp:
             res = {
                 "download": float(r.get("Download", 0)), "upload": float(r.get("Upload", 0)),
                 "ping": float(r.get("Ping", 0)), "jitter": float(r.get("Jitter", 0)),
-                "ip": r.get("IP", "--"), "server": r.get("Servidor", "--"), "interface": r.get("Interface", "--")
+                "ip": r.get("IP", "--"), "server": r.get("Servidor", "--"), 
+                "interface": r.get("Interface", "--"), "connection_type": r.get("Conexão", "--")
             }
             score = r.get("Nota", "0")
             scen = {
@@ -293,8 +309,11 @@ class InternetQualityApp:
         self.lbl_jitter.config(text="Jitter: -- ms")
         self.lbl_grade.config(text="--")
         self.lbl_interface.config(text="Interface: --")
+        self.lbl_connection_type.config(text="Conexão: --")
         self.lbl_ip_server.config(text="IP: -- | Servidor: --")
         self.graph.clear()
+        self.graph.update_graph(dl_val=0, ul_val=0) # Resetar gráfico
         for i in self.adequacy_items.values(): i.config(fg="#475569")
         self.progress['value'] = 0
         self.lbl_status.config(text="Resultados limpos")
+        self.tree.selection_set(()) # Desmarcar item selecionado na lista

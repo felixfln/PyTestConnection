@@ -1,11 +1,13 @@
 import pyspeedtest
+from typing import Optional, Callable, Dict, Any
 from .base import BaseEngine
 
 class PySpeedtestEngine(BaseEngine):
-    def get_name(self):
+    def get_name(self) -> str:
         return "PySpeedtest (Alternativo)"
 
-    def measure(self, callback=None):
+    def measure(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
+        """Implementação simplificada usando pyspeedtest do PyPI"""
         try:
             st = pyspeedtest.SpeedTest()
             

@@ -9,7 +9,7 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
-LOCK_FILE = os.path.join(os.getenv('TEMP', '.'), 'pytestconnection.lock')
+from src.constants import LOCK_FILE, VERSION
 
 def single_instance_guard():
     """Terminates previous instances and stores current PID."""

@@ -2,14 +2,15 @@ import speedtest
 import threading
 import time
 import psutil
+from typing import Optional, Callable, Dict, Any
 from .base import BaseEngine
 from ..utils.logger import logger
 
 class SpeedtestEngine(BaseEngine):
-    def get_name(self):
+    def get_name(self) -> str:
         return "Speedtest.net"
 
-    def _live_monitor(self, stop_event, callback, mode="download"):
+    def _live_monitor(self, stop_event: threading.Event, callback: Optional[Callable[[str, float], None]], mode: str = "download") -> None:
         """Monitora o tráfego real da rede durante o teste para o gráfico."""
         try:
             # Captura inicial
@@ -42,7 +43,7 @@ class SpeedtestEngine(BaseEngine):
         except Exception as e:
             logger.warning(f"Live monitor falhou silenciosamente: {e}")
 
-    def measure(self, callback=None):
+    def measure(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
         try:
             logger.info("Inicializando cliente Speedtest.net (Ambiente Seguro)")
             st = speedtest.Speedtest(secure=True)

@@ -1,8 +1,9 @@
 import abc
+from typing import Optional, Callable, Dict, Any
 
 class BaseEngine(abc.ABC):
     @abc.abstractmethod
-    def measure(self, callback=None):
+    def measure(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
         """
         Performs the measurement.
         callback(type, value): optional function to report real-time data
@@ -11,5 +12,6 @@ class BaseEngine(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_name(self):
+    def get_name(self) -> str:
+        """Returns the provider name."""
         pass

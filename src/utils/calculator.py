@@ -1,35 +1,39 @@
 import json
 import os
 import sys
+from typing import Dict, Any, List
+from ..constants import METRICS_CONFIG
 
 class QualityCalculator:
-    def __init__(self, config_path="config/metrics_config.json"):
+    def __init__(self, config_path: str = METRICS_CONFIG) -> None:
         self.config = self._load_config(config_path)
 
-    def _get_resource_path(self, relative_path):
+    def _get_resource_path(self, relative_path: str) -> str:
         """ Get absolute path to resource, works for dev and for PyInstaller """
         try:
             # PyInstaller creates a temp folder and stores path in _MEIPASS
-            base_path = sys._MEIPASS
+            base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
         except Exception:
             base_path = os.path.abspath(".")
         
         path = os.path.join(base_path, relative_path)
         if not os.path.exists(path):
             # Fallback for dev environment structure
-            path = os.path.join(os.path.dirname(__file__), "..", "..", relative_path)
+            path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", relative_path))
         return path
 
-    def _load_config(self, path):
+    def _load_config(self, path: str) -> Dict[str, Any]:
         abs_path = self._get_resource_path(path)
         if os.path.exists(abs_path):
-            with open(abs_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            try:
+                with open(abs_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except: pass
         return {"metrics": {}, "scenarios": {}}
 
-    def calculate_score(self, results):
+    def calculate_score(self, results: Dict[str, Any]) -> int:
         metrics_config = self.config.get("metrics", {})
-        scores = []
+        scores: List[int] = []
         
         for key, metric in metrics_config.items():
             value = results.get(key, 0)
@@ -41,11 +45,11 @@ class QualityCalculator:
         
         if not scores:
             return 0
-        return round(sum(scores) / len(scores))
+        return int(round(sum(scores) / len(scores)))
 
-    def evaluate_scenarios(self, results, total_score):
+    def evaluate_scenarios(self, results: Dict[str, Any], total_score: int) -> Dict[str, int]:
         scenarios_config = self.config.get("scenarios", {})
-        evaluations = {}
+        evaluations: Dict[str, int] = {}
         
         for name, reqs in scenarios_config.items():
             # Estado inicial: 2 (Verde/Sucesso)

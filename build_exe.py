@@ -13,12 +13,13 @@ def build():
         '--onefile',
         '--windowed',
         '--name=PyTestConnection',
-        '--icon=NONE', # You can add an .ico file here
+        '--icon=NONE',
         '--add-data=config;config',
         '--add-data=data;data',
         '--hidden-import=speedtest',
         '--hidden-import=pyspeedtest',
         '--hidden-import=psutil',
+        '--paths=.',  # Garante que o diretório raiz seja base para imports do tipo 'from src...'
         '--distpath=dist',
         '--workpath=build',
         '--clean'

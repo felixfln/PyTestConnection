@@ -1,19 +1,20 @@
 import tkinter as tk
+from typing import List, Optional, Any
 
 class DynamicGraph(tk.Canvas):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master: Any, **kwargs: Any) -> None:
         super().__init__(master, **kwargs)
-        self.dl_points = []
-        self.ul_points = []
-        self.max_val = 10
-        self.bg_color = "#0f172a"
-        self.grid_color = "#1e293b"
-        self.dl_line_color = "#22d3ee" # Ciano
-        self.ul_line_color = "#fbbf24" # Âmbar
-        self.font = ("Segoe UI", 9)
+        self.dl_points: List[float] = []
+        self.ul_points: List[float] = []
+        self.max_val: float = 10.0
+        self.bg_color: str = "#0f172a"
+        self.grid_color: str = "#1e293b"
+        self.dl_line_color: str = "#22d3ee" # Ciano
+        self.ul_line_color: str = "#fbbf24" # Âmbar
+        self.font: tuple = ("Segoe UI", 9)
         self.bind("<Configure>", lambda e: self._setup_axes())
 
-    def _setup_axes(self):
+    def _setup_axes(self) -> None:
         self.delete("all")
         w, h = self.winfo_width(), self.winfo_height()
         if w < 10: w = 400
@@ -39,7 +40,7 @@ class DynamicGraph(tk.Canvas):
         self.create_text(60, 15, text="● Download", fill=self.dl_line_color, anchor="w", font=self.font)
         self.create_text(160, 15, text="● Upload", fill=self.ul_line_color, anchor="w", font=self.font)
 
-    def update_graph(self, dl_val=None, ul_val=None):
+    def update_graph(self, dl_val: Optional[float] = None, ul_val: Optional[float] = None) -> None:
         if dl_val is not None:
             self.dl_points.append(dl_val)
         if ul_val is not None:
@@ -50,15 +51,15 @@ class DynamicGraph(tk.Canvas):
         if len(self.ul_points) > 60: self.ul_points.pop(0)
             
         all_vals = [v for v in (self.dl_points + self.ul_points) if v is not None]
-        curr_max = max(all_vals, default=10)
+        curr_max = max(all_vals, default=10.0)
         
         if curr_max > self.max_val * 0.9 or curr_max < self.max_val * 0.4:
-            self.max_val = max(curr_max * 1.3, 10)
+            self.max_val = max(curr_max * 1.3, 10.0)
             self._setup_axes()
         
         self._draw_lines()
 
-    def _draw_lines(self):
+    def _draw_lines(self) -> None:
         self.delete("line")
         w, h = self.winfo_width(), self.winfo_height()
         if w < 10: w = 400
@@ -67,7 +68,7 @@ class DynamicGraph(tk.Canvas):
         
         # Download
         if len(self.dl_points) >= 2:
-            points = []
+            points: List[float] = []
             dx = (w - start_x) / (len(self.dl_points)-1)
             for i, val in enumerate(self.dl_points):
                 x = start_x + (i * dx)
@@ -77,7 +78,7 @@ class DynamicGraph(tk.Canvas):
 
         # Upload
         if len(self.ul_points) >= 2:
-            points = []
+            points: List[float] = []
             dx = (w - start_x) / (len(self.ul_points)-1)
             for i, val in enumerate(self.ul_points):
                 x = start_x + (i * dx)
@@ -85,7 +86,7 @@ class DynamicGraph(tk.Canvas):
                 points.extend([x, y])
             self.create_line(points, fill=self.ul_line_color, width=3, smooth=True, tags="line", splinesteps=12)
 
-    def clear(self):
+    def clear(self) -> None:
         self.dl_points = []
         self.ul_points = []
         self._setup_axes()
