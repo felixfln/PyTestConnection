@@ -25,6 +25,14 @@ class InternetQualityApp:
     current_records: List[Dict[str, Any]]
     is_measuring: bool
     
+    # Scheduling State
+    schedule_active: bool
+    schedule_interval: int
+    schedule_unit: str  # "Minuto(s)" ou "Segundo(s)"
+    schedule_is_deep: bool
+    next_run: Optional[datetime]
+    schedule_modal: Optional[tk.Toplevel]
+    
     # UI Components
     canvas: tk.Canvas
     scrollbar: ttk.Scrollbar
@@ -42,6 +50,8 @@ class InternetQualityApp:
     lbl_ip_server: tk.Label
     graph: DynamicGraph
     btn_measure: tk.Button
+    btn_deep_measure: tk.Button
+    btn_schedule: tk.Button
     btn_clear: tk.Button
     tree: ttk.Treeview
     adequacy_items: Dict[str, tk.Label]
@@ -59,10 +69,21 @@ class InternetQualityApp:
         self.current_records = []
         self.is_measuring = False
 
+        # Configurações iniciais do Agendamento (Default da Issue)
+        self.schedule_active = False
+        self.schedule_interval = 1
+        self.schedule_unit = "Minuto(s)"
+        self.schedule_is_deep = False
+        self.next_run = None
+        self.schedule_modal = None
+
         self._apply_theme()
         self._setup_main_scroll()
         self._create_widgets()
         self._load_history()
+        
+        # Inicia o loop de monitoramento de agendamentos (roda a cada ~1 segundo invisivelmente)
+        self.root.after(1000, self._check_schedule)
 
     def _apply_theme(self) -> None:
         style = ttk.Style()
@@ -166,9 +187,15 @@ class InternetQualityApp:
         # Buttons
         btns = tk.Frame(self.main_container, bg=COLORS["bg"])
         btns.pack(fill=tk.X, pady=5)
-        self.btn_measure = tk.Button(btns, text="INICIAR AVALIAÇÃO", command=self._start_measurement, bg=COLORS["accent"], fg=COLORS["bg"], font=("Segoe UI", 12, "bold"), bd=0, padx=25, pady=12, activebackground=COLORS["accent_dim"], cursor="hand2")
+        self.btn_measure = tk.Button(btns, text="TESTE RÁPIDO", command=lambda: self._start_measurement(deep_test=False), bg=COLORS["accent"], fg=COLORS["bg"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground=COLORS["accent_dim"], cursor="hand2")
         self.btn_measure.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        self.btn_clear = tk.Button(btns, text="LIMPAR RESULTADOS", command=self._clear_ui, bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12, "bold"), bd=0, padx=25, pady=12, activebackground="#334155", cursor="hand2")
+        self.btn_deep_measure = tk.Button(btns, text="TESTE PROFUNDO", command=lambda: self._start_measurement(deep_test=True), bg="#8b5cf6", fg=COLORS["bg"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground="#7c3aed", cursor="hand2")
+        self.btn_deep_measure.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+        self.btn_schedule = tk.Button(btns, text="AGENDAMENTO INATIVO", command=self._open_schedule_modal, bg=COLORS["card"], fg=COLORS["error"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground="#334155", cursor="hand2")
+        self.btn_schedule.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+        self.btn_clear = tk.Button(btns, text="LIMPAR", command=self._clear_ui, bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground="#334155", cursor="hand2")
         self.btn_clear.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Adequacy
@@ -203,16 +230,24 @@ class InternetQualityApp:
         self.tree.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
-    def _start_measurement(self) -> None:
+    def _start_measurement(self, deep_test: bool = False, force_close_modal: bool = False) -> None:
+        # Quando acionado via automação agendada, garantimos a destruição e interrupção da modal e árvore
+        if force_close_modal and self.schedule_modal and self.schedule_modal.winfo_exists():
+            self.schedule_modal.destroy()
+            self.schedule_modal = None
+            
         self._clear_ui() # Resetar tudo antes de começar, como solicitado
         self.btn_measure.config(state="disabled")
+        self.btn_deep_measure.config(state="disabled")
+        self.btn_schedule.config(state="disabled")
         self.btn_clear.config(state="disabled")
         self.is_measuring = True
         self.progress['value'] = 0
-        self.lbl_status.config(text="Avaliando conexão...")
-        threading.Thread(target=self._measurement_task, daemon=True).start()
+        status_text = "Avaliando conexão (Teste Profundo)..." if deep_test else "Avaliando conexão..."
+        self.lbl_status.config(text=status_text)
+        threading.Thread(target=self._measurement_task, args=(deep_test,), daemon=True).start()
 
-    def _measurement_task(self) -> None:
+    def _measurement_task(self, deep_test: bool) -> None:
         try:
             def callback(m_type: str, val: Any) -> None:
                 if m_type == "progress": self.root.after(0, lambda: self.progress.config(value=val))
@@ -230,7 +265,7 @@ class InternetQualityApp:
                 elif m_type == "ip": self.root.after(0, lambda: self._update_ip_server(ip=val))
                 elif m_type == "server": self.root.after(0, lambda: self._update_ip_server(server=val))
 
-            results = self.engine_manager.run_measurement(callback=callback)
+            results = self.engine_manager.run_measurement(callback=callback, deep_test=deep_test)
             score = self.calculator.calculate_score(results)
             scenarios = self.calculator.evaluate_scenarios(results, score)
             
@@ -252,7 +287,13 @@ class InternetQualityApp:
             self.root.after(0, lambda: messagebox.showerror("Erro de Rede", str(e)))
         finally:
             self.is_measuring = False
-            self.root.after(0, lambda: [self.btn_measure.config(state="normal"), self.btn_clear.config(state="normal"), self.lbl_status.config(text="Teste finalizado")])
+            self.root.after(0, lambda: [
+                self.btn_measure.config(state="normal"), 
+                self.btn_deep_measure.config(state="normal"),
+                self.btn_schedule.config(state="normal"),
+                self.btn_clear.config(state="normal"), 
+                self.lbl_status.config(text="Teste finalizado")
+            ])
 
     def _update_ui(self, res: Dict[str, Any], score: Union[int, str], scen: Dict[str, int]) -> None:
         # Mapeamento de cor e adjetivo baseado na pontuação 0-100
@@ -358,3 +399,206 @@ class InternetQualityApp:
         self.progress['value'] = 0
         self.lbl_status.config(text="Resultados limpos")
         self.tree.selection_set(()) # Desmarcar item selecionado na lista
+
+    def _calculate_next_run(self, from_time: datetime, interval: int, unit: str) -> datetime:
+        from datetime import timedelta
+        if unit == "Hora(s)":
+            base = from_time.replace(minute=0, second=0, microsecond=0)
+            next_t = base + timedelta(hours=interval)
+            if next_t <= from_time:
+                next_t += timedelta(hours=interval)
+            return next_t
+        else: # Minutos
+            base = from_time.replace(second=0, microsecond=0)
+            minutes_to_add = interval - (base.minute % interval)
+            next_t = base + timedelta(minutes=minutes_to_add)
+            if next_t <= from_time:
+                next_t += timedelta(minutes=interval)
+            return next_t
+
+    def _check_schedule(self) -> None:
+        """Loop infinito invisível do Tkinter acionado a cada 1 segundo para o relógio de agendamento"""
+        self.root.after(1000, self._check_schedule) # Programa o próximo pulso
+        
+        if not self.schedule_active or not self.next_run:
+            return
+            
+        now = datetime.now()
+        # Fallback in case type checker thinks it is None
+        next_run_val = self.next_run
+        if next_run_val and now >= next_run_val:
+            # A hora chegou. 
+            if self.is_measuring:
+                # Conflito: O usuário já está rodando um teste manualmente. Ignite/Skip run.
+                logger.info("Agendamento bloqueado para não intervir no teste manual (skip this run).")
+            else:
+                # Caminho Limpo: Dispare o teste. 
+                logger.info(f"Executando agendamento autônomo. Teste Profundo: {self.schedule_is_deep}")
+                # Passa a flag par fechar possíveis modais abertas
+                self._start_measurement(deep_test=self.schedule_is_deep, force_close_modal=True)
+            
+            # Independentemente se foi skippado (usuário ocupado) ou rodado, agenda o próximo horário previsto
+            self.next_run = self._calculate_next_run(datetime.now(), self.schedule_interval, self.schedule_unit)
+
+    def _open_schedule_modal(self) -> None:
+        if self.schedule_modal and self.schedule_modal.winfo_exists():
+            self.schedule_modal.focus_set()
+            return
+            
+        self.schedule_modal = tk.Toplevel(self.root)
+        self.schedule_modal.title("Configurar Agendamento")
+        self.schedule_modal.geometry("350x450")
+        self.schedule_modal.configure(bg=COLORS["bg"])
+        self.schedule_modal.resizable(False, False)
+        
+        # Center Modal
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() / 2) - (350 / 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() / 2) - (450 / 2)
+        self.schedule_modal.geometry(f"+{int(x)}+{int(y)}")
+        
+        # Make modal block main window
+        self.schedule_modal.transient(self.root)
+        self.schedule_modal.grab_set()
+        
+        # UI Elements
+        container = tk.Frame(self.schedule_modal, bg=COLORS["bg"], padx=20, pady=20)
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(container, text="Agendamento de Testes", font=("Segoe UI", 16, "bold"), bg=COLORS["bg"], fg=COLORS["text"]).pack(pady=(0, 20))
+        
+        # === Intervalo e Unidade ===
+        frame_time = tk.Frame(container, bg=COLORS["bg"])
+        frame_time.pack(fill=tk.X, pady=10)
+        tk.Label(frame_time, text="Intervalo de Execução:", font=("Segoe UI", 10), bg=COLORS["bg"], fg=COLORS["text_dim"]).pack(anchor="w")
+        
+        entry_frame = tk.Frame(frame_time, bg=COLORS["bg"])
+        entry_frame.pack(fill=tk.X, pady=5)
+        
+        var_interval = tk.StringVar(value=str(self.schedule_interval))
+        entry_interval = tk.Entry(entry_frame, textvariable=var_interval, width=5, font=("Segoe UI", 12), justify="center")
+        entry_interval.pack(side=tk.LEFT, padx=(0, 10))
+        
+        def adjust_interval(delta):
+            try:
+                current = int(var_interval.get())
+            except ValueError:
+                current = 1
+            max_val = 24 if var_unit.get() == "Hora(s)" else 60
+            new_val = max(1, min(current + delta, max_val))
+            var_interval.set(str(new_val))
+                
+        tk.Button(entry_frame, text="-", command=lambda: adjust_interval(-1), width=2, bg=COLORS["card"], fg=COLORS["text"]).pack(side=tk.LEFT, padx=2)
+        tk.Button(entry_frame, text="+", command=lambda: adjust_interval(1), width=2, bg=COLORS["card"], fg=COLORS["text"]).pack(side=tk.LEFT, padx=(2, 10))
+        
+        var_unit = tk.StringVar(value=self.schedule_unit)
+        combo_unit = ttk.Combobox(entry_frame, textvariable=var_unit, values=["Minuto(s)", "Hora(s)"], state="readonly", width=12, font=("Segoe UI", 10))
+        combo_unit.pack(side=tk.LEFT)
+        
+        def sanitize_interval(*args):
+            val_str = var_interval.get()
+            if not val_str:
+                return
+            clean_str = "".join(filter(str.isdigit, val_str))
+            if clean_str != val_str:
+                var_interval.set(clean_str)
+                return
+            if clean_str:
+                val = int(clean_str)
+                max_val = 24 if var_unit.get() == "Hora(s)" else 60
+                if val > max_val:
+                    var_interval.set(str(max_val))
+
+        var_interval.trace_add("write", sanitize_interval)
+        var_unit.trace_add("write", sanitize_interval)
+        
+        # === Tipo de Teste ===
+        frame_type = tk.Frame(container, bg=COLORS["bg"])
+        frame_type.pack(fill=tk.X, pady=15)
+        tk.Label(frame_type, text="Tipo de Teste:", font=("Segoe UI", 10), bg=COLORS["bg"], fg=COLORS["text_dim"]).pack(anchor="w")
+        
+        var_is_deep = tk.BooleanVar(value=self.schedule_is_deep)
+        tk.Radiobutton(frame_type, text="Teste Rápido", variable=var_is_deep, value=False, bg=COLORS["bg"], fg=COLORS["text"], selectcolor=COLORS["card"], activebackground=COLORS["bg"]).pack(anchor="w", pady=2)
+        tk.Radiobutton(frame_type, text="Teste Profundo", variable=var_is_deep, value=True, bg=COLORS["bg"], fg=COLORS["text"], selectcolor=COLORS["card"], activebackground=COLORS["bg"]).pack(anchor="w", pady=2)
+
+        # === Status ===
+        frame_status = tk.Frame(container, bg=COLORS["bg"])
+        frame_status.pack(fill=tk.X, pady=15)
+        tk.Label(frame_status, text="Status do Agendamento:", font=("Segoe UI", 10), bg=COLORS["bg"], fg=COLORS["text_dim"]).pack(anchor="w")
+        
+        var_status = tk.BooleanVar(value=self.schedule_active)
+        tk.Checkbutton(frame_status, text="Ativo", variable=var_status, bg=COLORS["bg"], fg=COLORS["text"], selectcolor=COLORS["card"], activebackground=COLORS["bg"]).pack(anchor="w", pady=2)
+
+        # === Botões de Ação ===
+        frame_actions = tk.Frame(container, bg=COLORS["bg"])
+        frame_actions.pack(fill=tk.X, side=tk.BOTTOM, pady=10)
+        
+        # === Preview Label ===
+        lbl_preview = tk.Label(container, text="", font=("Segoe UI", 9, "italic"), bg=COLORS["bg"], fg=COLORS["accent"])
+        lbl_preview.pack(side=tk.BOTTOM, pady=(0, 20))
+
+        def update_preview(*args):
+            if not self.schedule_modal or not self.schedule_modal.winfo_exists():
+                return
+                
+            if not var_status.get():
+                lbl_preview.config(text="")
+            else:
+                try:
+                    interval_val = int(var_interval.get())
+                    if interval_val < 1: interval_val = 1
+                except ValueError:
+                    interval_val = 1
+                    
+                unit = var_unit.get()
+                max_val = 24 if unit == "Hora(s)" else 60
+                interval_val = min(interval_val, max_val)
+                    
+                predicted = self._calculate_next_run(datetime.now(), interval_val, unit)
+                lbl_preview.config(text=f"Próxima execução: {predicted.strftime('%d/%m/%Y %H:%M')}")
+                
+            # Loop recursivo para garantir que a hora fique atualizando e rodando
+            self.schedule_modal.after(1000, update_preview)
+
+        var_interval.trace_add("write", lambda *args: update_preview())
+        var_unit.trace_add("write", lambda *args: update_preview())
+        var_status.trace_add("write", lambda *args: update_preview())
+        update_preview()
+
+        def save_changes():
+            try:
+                interval_val = int(var_interval.get())
+                if interval_val < 1: interval_val = 1
+            except ValueError:
+                interval_val = 1
+                
+            unit = var_unit.get()
+            max_val = 24 if unit == "Hora(s)" else 60
+            interval_val = min(interval_val, max_val)
+            
+            self.schedule_interval = interval_val
+            self.schedule_unit = unit
+            self.schedule_is_deep = var_is_deep.get()
+            self.schedule_active = var_status.get()
+            
+            if self.schedule_active:
+                self.next_run = self._calculate_next_run(datetime.now(), self.schedule_interval, self.schedule_unit)
+                self.btn_schedule.config(text="AGENDAMENTO ATIVO", fg=COLORS["success"]) # Update Main Button Color
+            else:
+                self.next_run = None
+                self.btn_schedule.config(text="AGENDAMENTO INATIVO", fg=COLORS["error"]) # Reflete na UI
+                
+            logger.info(f"Agendamento atualizado. Ativo: {self.schedule_active}, Intevalo: {self.schedule_interval} {self.schedule_unit}")
+            self.schedule_modal.destroy()
+            self.schedule_modal = None
+
+        def cancel_changes():
+            self.schedule_modal.destroy()
+            self.schedule_modal = None
+            
+        tk.Button(frame_actions, text="OK", command=save_changes, bg=COLORS["accent"], fg=COLORS["bg"], font=("Segoe UI", 10, "bold"), width=12, bd=0).pack(side=tk.RIGHT, padx=5)
+        tk.Button(frame_actions, text="Cancelar", command=cancel_changes, bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 10), width=12, bd=0).pack(side=tk.RIGHT, padx=5)
+        
+        # Aguarda a janela ser fechada e libera
+        self.schedule_modal.wait_window()
+

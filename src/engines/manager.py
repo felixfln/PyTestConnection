@@ -2,6 +2,7 @@ import subprocess
 import re
 import platform
 import time
+import statistics
 from typing import Optional, Callable, Dict, Any, List
 from .base import BaseEngine
 from ..utils.logger import logger
@@ -15,15 +16,17 @@ class EngineManager:
             from .speedtest_provider import SpeedtestEngine
             self.engines.append(SpeedtestEngine())
         except Exception as e:
-            logger.error(f"Erro ao carregar SpeedtestEngine: {e}")
+            logger.warning(f"Erro ao carregar SpeedtestEngine: {e}")
 
         try:
-            from .alternative_provider import PySpeedtestEngine
-            self.engines.append(PySpeedtestEngine())
+            from .cloudflare_provider import CloudflareEngine
+            import requests # Quick health check
+            requests.get("https://speed.cloudflare.com/meta", timeout=3)
+            self.engines.append(CloudflareEngine())
         except Exception as e:
-            logger.error(f"Erro ao carregar PySpeedtestEngine: {e}")
+            logger.warning(f"Motor CloudflareEngine inativo e desabilitado.")
 
-    def run_measurement(self, callback: Optional[Callable[[str, Any], None]] = None) -> Dict[str, Any]:
+    def run_measurement(self, callback: Optional[Callable[[str, Any], None]] = None, deep_test: bool = False) -> Dict[str, Any]:
         if callback: 
             callback("status", "Iniciando avaliação sobre a qualidade da internet...")
             callback("progress", 5)
@@ -36,29 +39,102 @@ class EngineManager:
             callback("progress", 10)
 
         error_messages = []
-        for engine in self.engines:
-            try:
-                engine_name = engine.get_name()
-                if callback: callback("status", f"Preparando motores de medição ({engine_name})...")
-                
-                results = engine.measure(callback)
-                results["connection_type"] = connection_type # Preserva o que detectamos no início
-                
-                if callback: 
-                    callback("progress", 100)
-                    callback("status", "Teste finalizado.")
-                
-                logger.info(f"Medição concluída com sucesso via {engine_name}")
-                return results
-            except Exception as e:
-                err_msg = f"{engine.get_name()}: {str(e)}"
-                logger.error(err_msg)
-                error_messages.append(err_msg)
-                continue
+        all_results = []
+
+        total_engines = len(self.engines)
         
-        final_error = "Todos os motores de medição falharam:\n" + "\n".join(error_messages)
-        logger.error(final_error)
-        raise RuntimeError(final_error)
+        if deep_test:
+            base_iterations = 5 if total_engines == 1 else 3
+        else:
+            base_iterations = 1
+            
+        total_tests = total_engines * base_iterations
+        tests_done = 0
+
+        for engine_idx, engine in enumerate(self.engines):
+            engine_name = engine.get_name()
+            iterations = base_iterations
+
+            for iter_idx in range(iterations):
+                try:
+                    if deep_test:
+                        status_msg = f"Teste Profundo ({engine_name} - {iter_idx+1}/{iterations})..."
+                    else:
+                        status_msg = f"Preparando motores de medição ({engine_name})..."
+                    
+                    if callback: callback("status", status_msg)
+                    
+                    # Wrapper for callback to scale progress if we do multiple tests
+                    def wrapped_cb(m_type: str, val: Any) -> None:
+                        if callback:
+                            if m_type == "progress":
+                                # Scale progress: (tests_done * 100 + val) / total_tests
+                                # So each test takes 1/total_tests of the overall progress
+                                current_step_progress = val if isinstance(val, (int, float)) else 0
+                                scaled_progress = int(((tests_done * 100) + current_step_progress) / total_tests)
+                                callback("progress", scaled_progress)
+                            elif m_type == "status":
+                                # We might want to keep our status instead of engine's default, or prepend
+                                if deep_test:
+                                    callback("status", f"Teste Profundo ({engine_name} - {iter_idx+1}/{iterations}): {val}")
+                                else:
+                                    callback("status", val)
+                            else:
+                                callback(m_type, val)
+
+                    results = engine.measure(wrapped_cb)
+                    results["connection_type"] = connection_type # Preserva o que detectamos no início
+                    all_results.append(results)
+
+                    tests_done += 1
+
+                    if not deep_test:
+                        if callback: 
+                            callback("progress", 100)
+                            callback("status", "Teste finalizado.")
+                        
+                        logger.info(f"Medição rápida concluída com sucesso via {engine_name}")
+                        return results
+                        
+                except Exception as e:
+                    err_msg = f"{engine.get_name()} (teste {iter_idx+1}): {str(e)}"
+                    logger.error(err_msg)
+                    error_messages.append(err_msg)
+                    tests_done += 1 # advance step even on error
+                    continue
+
+        if not all_results:
+            final_error = "Todos os testes nos motores selecionados falharam:\n" + "\n".join(error_messages)
+            logger.error(final_error)
+            raise RuntimeError(final_error)
+
+        if deep_test:
+            # Agrega por mediana inteligente e tolerante a falhas parciais
+            if callback: callback("status", "Calculando estatísticas finais do teste profundo aguardando tolerância a falhas...")
+            
+            def get_median(key: str) -> float:
+                # Filtra os valores válidos: pega maiores que 0 para não jogar a mediana pra baixo em falhas parciais (0.0)
+                vals = [r[key] for r in all_results if key in r and isinstance(r[key], (int, float)) and r[key] > 0]
+                return statistics.median(vals) if vals else 0.0
+
+            final_res = {
+                "download": get_median("download"),
+                "upload": get_median("upload"),
+                "ping": get_median("ping"),
+                "jitter": get_median("jitter"),
+                "connection_type": connection_type,
+                # Campos de String: Busca de forma coesa a primeira válida ignorando "--" provindos de exceções de provedores falhos
+                "server": next((r["server"] for r in all_results if r.get("server") and r["server"] != "--"), "--"),
+                "ip": next((r["ip"] for r in all_results if r.get("ip") and r["ip"] != "--"), "--"),
+                "interface": next((r["interface"] for r in all_results if r.get("interface") and r["interface"] != "--"), "--")
+            }
+            if callback: 
+                callback("progress", 100)
+                callback("status", "Teste profundo finalizado.")
+            return final_res
+        
+        return all_results[0]
+
 
     def _get_connection_type(self) -> str:
         """Tenta detectar o tipo de conexão ativa usando critérios precisos do Windows."""

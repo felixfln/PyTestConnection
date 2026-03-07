@@ -6,27 +6,21 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 
 ## ✨ Funcionalidades Principais
 
-- **🚀 Medição em Tempo Real**: Visualize a velocidade de download e upload enquanto o teste acontece através de um gráfico dinâmico de duas linhas.
-- **🛡️ Alta Resiliência**: Sistema de failover inteligente que alterna entre diferentes provedores caso um deles falhe.
+- **🚀 Teste Rápido vs Profundo**: Escolha entre uma varredura instantânea ou uma medição profunda. O teste profundo roda múltiplas baterias (3x a 5x vezes) em diversos motores e apura a verdadeira conectividade ignorando oscilações através de cálculos de *Mediana*.
+- **☁️ Múltiplos Motores de Teste**: Integração robusta com *Speedtest API* e um motor proprietário super leve baseado na CDN da *Cloudflare* (Ping Direto e Transferência Bruta). Tolerância a falhas nativa: se um provedor cair, o sistema assume os que sobrarem automaticamente.
+- **⏱️ Agendamento Autônomo (Scheduling)**: Configure o sistema para testar sua internet sozinho a cada "X" horas ou minutos. A aplicação lida com conflitos de operação gráfica (GUI) graciosamente em tempo real sem interrupções.
 - **📊 Avaliação Premium (0-100)**: Algoritmo avançado que atribui uma pontuação granular e um status qualitativo (EXCELENTE, MUITO BOA, ESTÁVEL, LIMITADA ou INSTÁVEL).
-- **🚥 Semáforo de Capacidade**: Sistema de 3 níveis (Verde, Amarelo, Vermelho) para indicar a adequação da rede para:
-  - Redes Sociais
-  - Streaming HD e 4K
-  - Videoconferências
-  - Jogos Online (Baixa Latência/Jitter)
-  - Downloads Pesados
-- **� Identificação de Provedor**: Mostra o nome do seu provedor de internet (ISP) e IP no painel.
-- **📑 Histórico Interativo**: Explore medições passadas clicando nos registros para recarregar o gráfico e métricas.
-- **📝 Logs por Sessão**: Sistema de auditoria que gera um arquivo único de log para cada inicialização em `logs/`.
+- **🚥 Semáforo de Capacidade**: Sistema de 3 níveis (Verde, Amarelo, Vermelho) para indicar a adequação da rede para Videochamadas, Jogos Online, etc.
+- **📑 Histórico Interativo e Logs**: Explore medições passadas na interface ou audite o sistema pelos logs por sessão do Python em `logs/`.
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
 - **Python 3.14**: Linguagem base.
-- **Tkinter**: Interface gráfica nativa e leve.
-- **PyInstaller**: Para geração de executáveis Windows.
-- **Speedtest.net API (Secure)**: Motor principal de medição.
+- **Tkinter**: Interface gráfica nativa e assíncrona.
+- **PyInstaller**: Para automação e geração de executáveis Windows.
+- **Speedtest API & Cloudflare Edge**: Duplo motor de medição e redundância.
 - **ICMP Ping**: Medição real de Jitter através de pacotes sequenciais.
 
 ---
@@ -52,10 +46,10 @@ python -m src.main
 > **Nota**: O uso do `-m` garante que todos os módulos internos e o arquivo de versão sejam carregados corretamente.
 
 **Como usar na interface:**
-1. Clique em **"INICIAR AVALIAÇÃO"**.
-2. Acompanhe a **barra de progresso** e o gráfico em tempo real.
+1. Clique em **"TESTE RÁPIDO"** ou **"TESTE PROFUNDO"**.
+2. Acompanhe a **barra de progresso** preenchendo as etapas de cada motor.
 3. Ao finalizar, veja sua **pontuação (0-100)** e os **LEDs coloridos** de adequação.
-4. Clique em qualquer linha do **Histórico** para ver os detalhes daquela medição específica.
+4. Para testes automatizados, configure a janela em **"AGENDAMENTO INATIVO"** e ative-a.
 
 ### 📦 Passo 3: Criando o Executável (.exe)
 Para gerar o executável Windows:
