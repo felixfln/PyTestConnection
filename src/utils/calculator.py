@@ -37,6 +37,11 @@ class QualityCalculator:
         
         for key, metric in metrics_config.items():
             value = results.get(key, 0)
+            
+            # Ignora valores zerados (erros de medição)
+            if value <= 0:
+                continue
+                
             thresholds = metric.get("thresholds", [])
             for t in thresholds:
                 if t["min"] <= value <= t["max"]:
@@ -67,41 +72,45 @@ class QualityCalculator:
             if "min_download" in reqs:
                 val = results.get("download", 0)
                 req = reqs["min_download"]
-                if val < req:
-                    if val >= (req * 0.7): # Tolerância de 30% para Amarelo
-                        state = min(state, 1)
-                    else:
-                        state = 0
+                if val > 0: # IGNORA ZERO
+                    if val < req:
+                        if val >= (req * 0.7): # Tolerância de 30% para Amarelo
+                            state = min(state, 1)
+                        else:
+                            state = 0
 
             # Verificação de Upload
             if state > 0 and "min_upload" in reqs:
                 val = results.get("upload", 0)
                 req = reqs["min_upload"]
-                if val < req:
-                    if val >= (req * 0.7):
-                        state = min(state, 1)
-                    else:
-                        state = 0
+                if val > 0: # IGNORA ZERO
+                    if val < req:
+                        if val >= (req * 0.7):
+                            state = min(state, 1)
+                        else:
+                            state = 0
 
             # Verificação de Ping (Menor é melhor)
             if state > 0 and "min_ping" in reqs:
                 val = results.get("ping", 1000)
                 req = reqs["min_ping"]
-                if val > req:
-                    if val <= (req * 1.4): # Tolerância de 40% para Amarelo
-                        state = min(state, 1)
-                    else:
-                        state = 0
+                if val > 0 and val != 1000: # IGNORA ZERO e DEFAULTS
+                    if val > req:
+                        if val <= (req * 1.4): # Tolerância de 40% para Amarelo
+                            state = min(state, 1)
+                        else:
+                            state = 0
                 
             # Verificação de Jitter (Menor é melhor)
             if state > 0 and "min_jitter" in reqs:
                 val = results.get("jitter", 1000)
                 req = reqs["min_jitter"]
-                if val > req:
-                    if val <= (req * 1.5):
-                        state = min(state, 1)
-                    else:
-                        state = 0
+                if val > 0 and val != 1000: # IGNORA ZERO e DEFAULTS
+                    if val > req:
+                        if val <= (req * 1.5):
+                            state = min(state, 1)
+                        else:
+                            state = 0
                 
             evaluations[name] = state
             
