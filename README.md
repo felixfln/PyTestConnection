@@ -51,13 +51,19 @@ python -m src.main
 3. Ao finalizar, veja sua **pontuação (0-100)** e os **LEDs coloridos** de adequação.
 4. Para testes automatizados, configure a janela em **"AGENDAMENTO INATIVO"** e ative-a.
 
-### 📦 Passo 3: Criando o Executável (.exe)
-Para gerar o executável Windows:
+### 📦 Passo 3: Criando e Compartilhando o Executável (.exe)
+Para gerar o executável Windows nativo:
 1. No terminal, execute:
    ```bash
    python build_exe.py
    ```
 2. O arquivo gerado estará em `dist/PyTestConnection.exe`.
+
+> ⚠️ **IMPORTANTE: Portabilidade e Requisitos do Executável**
+>
+> 1. **Não requer instalação do Python**: O arquivo final gerado (`PyTestConnection.exe`) é totalmente autossuficiente (portátil). Para compartilhar a aplicação com outra pessoa, basta enviar o executável junto com as pastas **`data/`** e **`logs/`**. O usuário final **não precisa instalar o Python** nem nenhuma biblioteca adicional para que o sistema funcione.
+>
+> 2. **Exclusivo para Windows**: A aplicação, e por consequência o seu executável, foi desenvolvida inteiramente focada no **Windows**. Ela consome recursos exclusivos e de baixo nível do sistema operacional (como `PowerShell` e `netsh`) para auditar adaptadores de rede físicos e Wi-Fi com precisão profunda. Portanto, o arquivo `.exe` **não** funcionará no Linux ou macOS.
 
 ---
 
