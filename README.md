@@ -1,69 +1,69 @@
 # 🌐 PyTestConnection - Medidor de Qualidade de Internet
 
-O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 para medir e avaliar a qualidade da sua conexão de rede. Focado em precisão e resiliência, o sistema utiliza múltiplos motores de teste para garantir que você sempre tenha um diagnóstico confiável.
+O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 para medir e avaliar a qualidade da sua conexão de rede. Focado em precisão e resiliência, o sistema utiliza múltiplos motores de teste com tolerância nativa a falhas para garantir diagnósticos confiáveis.
 
 ---
 
 ## ✨ Funcionalidades Principais
 
-- **🚀 Teste Rápido vs Profundo**: Escolha entre uma varredura instantânea ou uma medição profunda. O teste profundo roda múltiplas baterias (3x a 5x vezes) em diversos motores e apura a verdadeira conectividade ignorando oscilações através de cálculos de *Mediana*.
-- **☁️ Múltiplos Motores de Teste**: Integração robusta com *Speedtest API* e um motor proprietário super leve baseado na CDN da *Cloudflare* (Ping Direto e Transferência Bruta). Tolerância a falhas nativa: se um provedor cair, o sistema assume os que sobrarem automaticamente.
-- **⏱️ Agendamento Autônomo (Scheduling)**: Configure o sistema para testar sua internet sozinho a cada "X" horas ou minutos. A aplicação lida com conflitos de operação gráfica (GUI) graciosamente em tempo real sem interrupções.
-- **📊 Avaliação Premium (0-100)**: Algoritmo avançado que atribui uma pontuação granular e um status qualitativo (EXCELENTE, MUITO BOA, ESTÁVEL, LIMITADA ou INSTÁVEL).
-- **🚥 Semáforo de Capacidade**: Sistema de 3 níveis (Verde, Amarelo, Vermelho) para indicar a adequação da rede para Videochamadas, Jogos Online, etc.
-- **📑 Histórico Interativo e Logs**: Explore medições passadas na interface ou audite o sistema pelos logs por sessão do Python em `logs/`.
+- **🚀 Teste Rápido vs Profundo**: Escolha entre uma medição instantânea (1 iteração no primeiro motor disponível) ou uma medição profunda (5 iterações por motor). O teste profundo utiliza a metodologia **"Max of Medians"** — calcula a mediana isolada de cada motor e seleciona a melhor rota estável, refletindo a verdadeira capacidade da conexão.
+- **☁️ Múltiplos Motores de Teste**: Integração com *Speedtest (Ookla)* e *Cloudflare Edge CDN*. Tolerância a falhas nativa: se um motor falhar ou estiver indisponível, o sistema prossegue com os que sobrarem automaticamente.
+- **📐 Metodologia Estatística (Max of Medians)**:
+  - **Download/Upload**: Mediana por motor → `max()` entre as medianas (capacidade máxima estável).
+  - **Ping/Jitter**: Mediana por motor → `min()` entre as medianas (melhor latência estável).
+  - Valores zerados (falhas de medição) são descartados automaticamente em todos os cálculos.
+- **⏱️ Agendamento Autônomo**: Configure testes automáticos a cada X minutos ou horas. A aplicação lida com conflitos de operação (GUI/testes simultâneos) graciosamente.
+- **📊 Avaliação Premium (0-100)**: Pontuação granular com status qualitativo: EXCELENTE, MUITO BOA, ESTÁVEL, LIMITADA ou INSTÁVEL.
+- **🚥 Semáforo de Adequação**: Sistema de 3 níveis (🟢 Verde, 🟡 Amarelo, 🔴 Vermelho) para cenários como Videochamadas, Jogos Online, Streaming 4K, etc.
+- **📑 Histórico e Logs**: Medições armazenadas em `data/data.txt` e logs por sessão em `logs/`.
+- **🛡️ Tolerância a Falhas**: Toda a aplicação é resiliente — motores que falham são ignorados sem travar a interface; dados corrompidos são isolados com backup automático; valores inválidos nunca afetam os cálculos.
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Python 3.14**: Linguagem base.
-- **Tkinter**: Interface gráfica nativa e assíncrona.
-- **PyInstaller**: Para automação e geração de executáveis Windows.
-- **Speedtest API & Cloudflare Edge**: Duplo motor de medição e redundância.
-- **ICMP Ping**: Medição real de Jitter através de pacotes sequenciais.
+- **Python 3.14** — Linguagem base.
+- **Tkinter** — Interface gráfica nativa com threading assíncrono.
+- **PyInstaller** — Geração de executáveis Windows portáteis.
+- **Speedtest API & Cloudflare Edge** — Duplo motor de medição e redundância.
+- **ICMP Ping** — Medição real de Jitter (variação entre latências consecutivas).
 
 ---
 
 ## 🚀 Como Começar
 
 ### Pré-requisitos
-- **Python 3.14**: Certifique-se de que o Python está instalado e adicionado ao seu PATH.
-- **Acesso à Internet**: Necessário para realizar os testes de velocidade.
+- **Python 3.14** instalado e adicionado ao PATH.
+- **Acesso à Internet** para realizar os testes.
 
 ### 📥 Passo 1: Instalação
-1. Abra o terminal (PowerShell ou Prompt de Comando) na pasta raiz do projeto.
-2. Instale as dependências:
-   ```bash
-   pip install -r docs/requirements.txt
-   ```
+```bash
+pip install -r docs/requirements.txt
+```
 
-### 🖥️ Passo 2: Execução via Terminal
-Para rodar o sistema diretamente via código (estando na raiz do projeto):
+### 🖥️ Passo 2: Execução
 ```bash
 python -m src.main
 ```
-> **Nota**: O uso do `-m` garante que todos os módulos internos e o arquivo de versão sejam carregados corretamente.
+> **Nota**: O `-m` garante que todos os módulos internos sejam carregados corretamente.
 
 **Como usar na interface:**
 1. Clique em **"TESTE RÁPIDO"** ou **"TESTE PROFUNDO"**.
-2. Acompanhe a **barra de progresso** preenchendo as etapas de cada motor.
+2. Acompanhe a **barra de progresso** e os valores atualizando em tempo real.
 3. Ao finalizar, veja sua **pontuação (0-100)** e os **LEDs coloridos** de adequação.
-4. Para testes automatizados, configure a janela em **"AGENDAMENTO INATIVO"** e ative-a.
+4. Para testes automáticos, clique em **"AGENDAMENTO INATIVO"** e configure o intervalo.
 
-### 📦 Passo 3: Criando e Compartilhando o Executável (.exe)
-Para gerar o executável Windows nativo:
-1. No terminal, execute:
-   ```bash
-   python build_exe.py
-   ```
-2. O arquivo gerado estará em `dist/PyTestConnection.exe`.
+### 📦 Passo 3: Gerando o Executável (.exe)
+```bash
+python build_exe.py
+```
+O arquivo gerado estará em `dist/PyTestConnection.exe`.
 
 > ⚠️ **IMPORTANTE: Portabilidade e Requisitos do Executável**
 >
-> 1. **Não requer instalação do Python**: O arquivo final gerado (`PyTestConnection.exe`) é totalmente autossuficiente (portátil). Para compartilhar a aplicação com outra pessoa, basta enviar o executável junto com as pastas **`data/`** e **`logs/`**. O usuário final **não precisa instalar o Python** nem nenhuma biblioteca adicional para que o sistema funcione.
+> 1. **Não requer instalação do Python**: O executável é autossuficiente. Basta enviar o `.exe` junto com as pastas **`data/`** e **`config/`**.
 >
-> 2. **Exclusivo para Windows**: A aplicação, e por consequência o seu executável, foi desenvolvida inteiramente focada no **Windows**. Ela consome recursos exclusivos e de baixo nível do sistema operacional (como `PowerShell` e `netsh`) para auditar adaptadores de rede físicos e Wi-Fi com precisão profunda. Portanto, o arquivo `.exe` **não** funcionará no Linux ou macOS.
+> 2. **Exclusivo para Windows**: A aplicação consome recursos exclusivos do SO (PowerShell, netsh) para auditoria de adaptadores de rede. Não funciona no Linux ou macOS.
 
 ---
 
@@ -72,25 +72,40 @@ Para gerar o executável Windows nativo:
 ```text
 PyTestConnection/
 ├── config/
-│   └── metrics_config.json   # Rigor das avaliações e semáforo
+│   └── metrics_config.json   # Thresholds de pontuação e semáforo
 ├── data/
-│   └── data.txt             # Histórico de medições
-├── logs/                    # Logs de execução (app_data_hora.log)
+│   └── data.txt              # Histórico de medições
+├── docs/
+│   └── requirements.txt      # Dependências Python
+├── logs/                     # Logs por sessão (app_YYYYMMDD_HHMMSS.log)
 ├── src/
-│   ├── engines/             # Lógica de medição e Jitter
-│   ├── ui/                  # Interface e componentes gráficos
-│   └── utils/               # Logs, persistência e cálculos
-└── build_exe.py             # Script de automação do PyInstaller
+│   ├── constants.py          # Cores, versão, caminhos
+│   ├── main.py               # Ponto de entrada (single instance guard)
+│   ├── engines/
+│   │   ├── base.py           # Interface abstrata dos motores
+│   │   ├── manager.py        # Orquestrador (Max of Medians)
+│   │   ├── speedtest_provider.py   # Motor Speedtest (Ookla)
+│   │   └── cloudflare_provider.py  # Motor Cloudflare Edge
+│   ├── ui/
+│   │   ├── app.py            # Interface principal (Tkinter)
+│   │   └── components/
+│   │       └── graph.py      # Gráfico dinâmico de velocidade
+│   └── utils/
+│       ├── calculator.py     # Pontuação 0-100 e semáforo
+│       ├── logger.py         # Logger singleton por sessão
+│       ├── network.py        # Medição de Jitter (ICMP)
+│       └── persistence.py    # Leitura/escrita do histórico
+└── build_exe.py              # Script de build do PyInstaller
 ```
 
 ---
 
 ## ⚙️ Configurações Customizadas
 
-Você pode calibrar o rigor do sistema em `config/metrics_config.json`. Lá você altera:
-- Limites para a pontuação 0-100.
-- Margens de tolerância para a cor Amarela do semáforo.
-- Requisitos mínimos de Download/Ping para cada cenário.
+Calibre o rigor das avaliações em `config/metrics_config.json`:
+- Limites (thresholds) para a pontuação 0-100.
+- Margens de tolerância para o nível Amarelo do semáforo.
+- Requisitos mínimos de Download/Upload/Ping para cada cenário de uso.
 
 ---
 

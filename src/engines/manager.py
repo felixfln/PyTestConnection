@@ -44,7 +44,7 @@ class EngineManager:
         total_engines = len(self.engines)
         
         if deep_test:
-            base_iterations = 5 if total_engines == 1 else 3
+            base_iterations = 5
         else:
             base_iterations = 1
             
@@ -84,11 +84,20 @@ class EngineManager:
 
                     results = engine.measure(wrapped_cb)
                     results["connection_type"] = connection_type # Preserva o que detectamos no início
+                    results["engine_name"] = engine_name
                     all_results.append(results)
 
                     tests_done += 1
 
                     if not deep_test:
+                        # Proteção: Qualquer métrica zerada indica falha de coleta
+                        zero_metrics = [k for k in ("download", "upload", "ping", "jitter") if results.get(k, 0) <= 0]
+                        if zero_metrics:
+                            desc = ", ".join(zero_metrics)
+                            logger.warning(f"{engine_name}: Métricas zeradas ({desc}). Tentando próximo motor...")
+                            error_messages.append(f"{engine_name}: {desc} retornou 0")
+                            continue  # Tenta o próximo motor
+                        
                         if callback: 
                             callback("progress", 100)
                             callback("status", "Teste finalizado.")
@@ -109,19 +118,30 @@ class EngineManager:
             raise RuntimeError(final_error)
 
         if deep_test:
-            # Agrega por mediana inteligente e tolerante a falhas parciais
-            if callback: callback("status", "Calculando estatísticas finais do teste profundo aguardando tolerância a falhas...")
+            if callback: callback("status", "Calculando estatísticas isoladas e selecionando melhores medianas das rotas...")
             
-            def get_median(key: str) -> float:
-                # Filtra os valores válidos: pega maiores que 0 para não jogar a mediana pra baixo em falhas parciais (0.0)
-                vals = [r[key] for r in all_results if key in r and isinstance(r[key], (int, float)) and r[key] > 0]
+            engines_run = list(set([r.get("engine_name") for r in all_results if r.get("engine_name")]))
+            
+            def get_engine_median(key: str, engine_id: str) -> float:
+                # Filtra os valores estritamente maiores que 0
+                vals = [r[key] for r in all_results if r.get("engine_name") == engine_id and key in r and isinstance(r[key], (int, float)) and r[key] > 0]
                 return statistics.median(vals) if vals else 0.0
 
+            median_dls = [get_engine_median("download", e) for e in engines_run]
+            median_uls = [get_engine_median("upload", e) for e in engines_run]
+            median_pings = [get_engine_median("ping", e) for e in engines_run]
+            median_jitters = [get_engine_median("jitter", e) for e in engines_run]
+            
+            valid_dls = [v for v in median_dls if v > 0]
+            valid_uls = [v for v in median_uls if v > 0]
+            valid_pings = [v for v in median_pings if v > 0]
+            valid_jitters = [v for v in median_jitters if v > 0]
+
             final_res = {
-                "download": get_median("download"),
-                "upload": get_median("upload"),
-                "ping": get_median("ping"),
-                "jitter": get_median("jitter"),
+                "download": max(valid_dls) if valid_dls else 0.0,
+                "upload": max(valid_uls) if valid_uls else 0.0,
+                "ping": min(valid_pings) if valid_pings else 0.0,
+                "jitter": min(valid_jitters) if valid_jitters else 0.0,
                 "connection_type": connection_type,
                 # Campos de String: Busca de forma coesa a primeira válida ignorando "--" provindos de exceções de provedores falhos
                 "server": next((r["server"] for r in all_results if r.get("server") and r["server"] != "--"), "--"),
@@ -132,8 +152,10 @@ class EngineManager:
                 callback("progress", 100)
                 callback("status", "Teste profundo finalizado.")
             return final_res
-        
-        return all_results[0]
+        # Teste rápido: todos os motores retornaram download zero — falha explícita.
+        fail_msg = "Nenhum motor de medição retornou um download válido. Teste descartado.\n" + "\n".join(error_messages)
+        logger.error(fail_msg)
+        raise RuntimeError(fail_msg)
 
 
     def _get_connection_type(self) -> str:

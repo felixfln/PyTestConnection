@@ -266,6 +266,16 @@ class InternetQualityApp:
                 elif m_type == "server": self.root.after(0, lambda: self._update_ip_server(server=val))
 
             results = self.engine_manager.run_measurement(callback=callback, deep_test=deep_test)
+
+            # Barreira: Não salvar resultados com qualquer métrica zerada
+            zero_metrics = [k for k in ("download", "upload", "ping", "jitter") if results.get(k, 0) <= 0]
+            if zero_metrics:
+                desc = ", ".join(zero_metrics)
+                logger.warning(f"Resultado descartado: métricas zeradas ({desc}).")
+                self.root.after(0, lambda: self.lbl_status.config(
+                    text="Teste falhou — resultado inconsistente descartado."))
+                return
+
             score = self.calculator.calculate_score(results)
             scenarios = self.calculator.evaluate_scenarios(results, score)
             
