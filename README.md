@@ -15,8 +15,9 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 - **⏱️ Agendamento Autônomo**: Configure testes automáticos a cada X minutos ou horas. A aplicação lida com conflitos de operação (GUI/testes simultâneos) graciosamente.
 - **📊 Avaliação Premium (0-100)**: Pontuação granular com status qualitativo: EXCELENTE, MUITO BOA, ESTÁVEL, LIMITADA ou INSTÁVEL.
 - **🚥 Semáforo de Adequação**: Sistema de 3 níveis (🟢 Verde, 🟡 Amarelo, 🔴 Vermelho) para cenários como Videochamadas, Jogos Online, Streaming 4K, etc.
-- **📑 Histórico e Logs**: Medições armazenadas em `data/data.txt` e logs por sessão em `logs/`.
-- **🛡️ Tolerância a Falhas**: Toda a aplicação é resiliente — motores que falham são ignorados sem travar a interface; dados corrompidos são isolados com backup automático; valores inválidos nunca afetam os cálculos.
+- **📑 Histórico e Logs**: Medições armazenadas em `data/data.pconn` (formato obfuscado para integridade) e logs por sessão em `logs/` (formato `.log` legível).
+- **🛡️ Tolerância e Portabilidade**: Toda a aplicação é resiliente. O banco de dados `.pconn` utiliza codificação Base64 para evitar edições manuais acidentais, mas mantém portabilidade total entre máquinas.
+- **🔍 Auditoria Facilitada**: Botão **"VER LOGS"** integrado para abrir e visualizar qualquer arquivo de log diretamente no editor padrão do Windows.
 
 ---
 
@@ -24,7 +25,8 @@ O **PyTestConnection** é uma ferramenta robusta desenvolvida em Python 3.14 par
 
 - **Python 3.14** — Linguagem base.
 - **Tkinter** — Interface gráfica nativa com threading assíncrono.
-- **PyInstaller** — Geração de executáveis Windows portáteis.
+- **Pillow** — Tratamento dinâmico de ícones e imagens.
+- **PyInstaller** — Geração de executáveis Windows portáteis e dinâmicos.
 - **Speedtest API & Cloudflare Edge** — Duplo motor de medição e redundância.
 - **ICMP Ping** — Medição real de Jitter (variação entre latências consecutivas).
 
@@ -61,9 +63,9 @@ O arquivo gerado estará em `dist/PyTestConnection.exe`.
 
 > ⚠️ **IMPORTANTE: Portabilidade e Requisitos do Executável**
 >
-> 1. **Não requer instalação do Python**: O executável é autossuficiente. Basta enviar o `.exe` junto com as pastas **`data/`** e **`config/`**.
+> 1. **Não requer instalação do Python**: O executável é autossuficiente. O sistema detecta automaticamente o diretório atual para salvar dados em `data/` e logs em `logs/`.
 >
-> 2. **Exclusivo para Windows**: A aplicação consome recursos exclusivos do SO (PowerShell, netsh) para auditoria de adaptadores de rede. Não funciona no Linux ou macOS.
+> 2. **Portabilidade**: Basta enviar o `.exe` acompanhado das pastas **`data/`**, **`config/`** e **`src/assets/`** (para funcionamento dos ícones).
 
 ---
 
@@ -74,12 +76,13 @@ PyTestConnection/
 ├── config/
 │   └── metrics_config.json   # Thresholds de pontuação e semáforo
 ├── data/
-│   └── data.txt              # Histórico de medições
+│   └── data.pconn            # Histórico de medições (Obfuscado)
 ├── docs/
-│   └── requirements.txt      # Dependências Python
+│   └── requirements.txt      # Dependências Python (Inclui Pillow)
 ├── logs/                     # Logs por sessão (app_YYYYMMDD_HHMMSS.log)
 ├── src/
-│   ├── constants.py          # Cores, versão, caminhos
+│   ├── assets/               # Ícones da aplicação (.ico)
+│   ├── constants.py          # Cores, versão, caminhos dinâmicos
 │   ├── main.py               # Ponto de entrada (single instance guard)
 │   ├── engines/
 │   │   ├── base.py           # Interface abstrata dos motores
@@ -92,9 +95,9 @@ PyTestConnection/
 │   │       └── graph.py      # Gráfico dinâmico de velocidade
 │   └── utils/
 │       ├── calculator.py     # Pontuação 0-100 e semáforo
-│       ├── logger.py         # Logger singleton por sessão
+│       ├── logger.py         # Logger singleton com caminho dinâmico
 │       ├── network.py        # Medição de Jitter (ICMP)
-│       └── persistence.py    # Leitura/escrita do histórico
+│       └── persistence.py    # Motor de migração e persistência .pconn
 └── build_exe.py              # Script de build do PyInstaller
 ```
 

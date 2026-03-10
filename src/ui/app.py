@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, font, filedialog
+from PIL import Image, ImageTk
 import threading
 from datetime import datetime
 import os
@@ -11,7 +12,7 @@ from ..utils.persistence import PersistenceManager
 from ..utils.calculator import QualityCalculator
 from ..utils.logger import logger
 from .components.graph import DynamicGraph
-from ..constants import COLORS, VERSION, APP_TITLE, WINDOW_SIZE, SEMAPHORE_COLORS, SCHEDULER_ICON_PATH
+from ..constants import COLORS, VERSION, APP_TITLE, WINDOW_SIZE, SEMAPHORE_COLORS, SCHEDULER_ICON_PATH, ICON_PATH
 
 
 # Módulo da Interface Principal
@@ -54,9 +55,11 @@ class InternetQualityApp:
     btn_deep_measure: tk.Button
     btn_schedule: tk.Button
     btn_clear: tk.Button
+    btn_logs: tk.Button
     tree: ttk.Treeview
     table_cols: List[Tuple[str, str]]
     adequacy_items: Dict[str, tk.Label]
+    logo_img: Optional[ImageTk.PhotoImage]
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
@@ -70,6 +73,7 @@ class InternetQualityApp:
         self.calculator = QualityCalculator()
         self.current_records = []
         self.is_measuring = False
+        self.logo_img = None
 
         # Configurações iniciais do Agendamento (Default da Issue)
         self.schedule_active = False
@@ -135,8 +139,25 @@ class InternetQualityApp:
         # Header
         header = tk.Frame(self.main_container, bg=COLORS["bg"])
         header.pack(fill=tk.X, pady=(0, 10))
-        tk.Label(header, text="PYTEST", bg=COLORS["bg"], fg=COLORS["text"], font=("Segoe UI", 24, "bold")).pack(side=tk.LEFT)
-        tk.Label(header, text="CONNECTION", bg=COLORS["bg"], fg=COLORS["accent"], font=("Segoe UI", 24, "bold")).pack(side=tk.LEFT, padx=5)
+        
+        # App Icon
+        try:
+            if os.path.exists(ICON_PATH):
+                original = Image.open(ICON_PATH)
+                # O ICO pode ter múltiplas camadas, pegamos a maior ou a que desejamos
+                resized = original.resize((40, 40), Image.Resampling.LANCZOS)
+                self.logo_img = ImageTk.PhotoImage(resized)
+                icon_lbl = tk.Label(header, image=self.logo_img, bg=COLORS["bg"])
+                icon_lbl.pack(side=tk.LEFT, padx=(0, 12))
+        except Exception as e:
+            logger.warning(f"Erro ao carregar ícone do topo: {e}")
+
+        # Modern Fonts Check
+        title_font_bold = ("Rubik", 24, "bold") if "Rubik" in font.families() else ("Segoe UI Variable Display", 24, "bold")
+        title_font_reg = ("Rubik", 24) if "Rubik" in font.families() else ("Segoe UI Variable Display", 24)
+
+        tk.Label(header, text="PyTest", bg=COLORS["bg"], fg=COLORS["text"], font=title_font_bold).pack(side=tk.LEFT)
+        tk.Label(header, text="Connection", bg=COLORS["bg"], fg=COLORS["accent"], font=title_font_reg).pack(side=tk.LEFT, padx=2)
         
         # Progress
         self.progress = ttk.Progressbar(self.main_container, orient=tk.HORIZONTAL, mode='determinate', style="TProgressbar")
@@ -200,7 +221,10 @@ class InternetQualityApp:
         self.btn_schedule.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         
         self.btn_clear = tk.Button(btns, text="LIMPAR", command=self._clear_ui, bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground="#334155", cursor="hand2")
-        self.btn_clear.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.btn_clear.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+        self.btn_logs = tk.Button(btns, text="VER LOGS", command=self._view_logs, bg=COLORS["card"], fg=COLORS["accent"], font=("Segoe UI", 12, "bold"), bd=0, padx=15, pady=12, activebackground="#334155", cursor="hand2")
+        self.btn_logs.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Adequacy
         adequacy = tk.Frame(self.main_container, bg=COLORS["bg"])
@@ -317,7 +341,8 @@ class InternetQualityApp:
                 self.btn_measure.config(state="normal"), 
                 self.btn_deep_measure.config(state="normal"),
                 self.btn_schedule.config(state="normal"),
-                self.btn_clear.config(state="normal"), 
+                self.btn_clear.config(state="normal"),
+                self.btn_logs.config(state="normal"),
                 self.lbl_status.config(text="Teste finalizado")
             ])
 
@@ -431,6 +456,28 @@ class InternetQualityApp:
         self.progress['value'] = 0
         self.lbl_status.config(text="Resultados limpos")
         self.tree.selection_set(()) # Desmarcar item selecionado na lista
+
+    def _view_logs(self):
+        """Abre seletor para escolher qual log visualizar diretamente."""
+        from ..constants import LOG_DIR
+
+        # Abre o diálogo padrão do Windows para selecionar o arquivo .log
+        log_file = filedialog.askopenfilename(
+            initialdir=LOG_DIR,
+            title="Selecionar Log para Visualização",
+            filetypes=[("Arquivos de Log", "*.log"), ("Todos os arquivos", "*.*")]
+        )
+        
+        if not log_file: # Usuário cancelou
+            return
+
+        try:
+            # Como agora o log é texto puro, abrimos diretamente no editor padrão
+            os.startfile(log_file)
+            logger.info(f"Visualizando log: {os.path.basename(log_file)}")
+        except Exception as e:
+            logger.error(f"Erro ao abrir arquivo de log: {e}")
+            messagebox.showerror("Erro de I/O", f"Não foi possível abrir este arquivo: {e}")
 
     def _calculate_next_run(self, from_time: datetime, interval: int, unit: str) -> datetime:
         from datetime import timedelta

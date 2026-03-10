@@ -6,9 +6,18 @@ VERSION = "1.0.4"
 from src.utils.resource_manager import get_resource_path
 
 # Caminhos de Arquivos e Recursos
-DATA_FILE = "data/data.txt"
-METRICS_CONFIG = "config/metrics_config.json"
-LOG_DIR = "logs"
+if getattr(sys, 'frozen', False):
+    # Rodando como executável (.exe)
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Rodando como script (.py)
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+DATA_DIR = os.path.join(BASE_DIR, "data")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+DATA_FILE = os.path.join(DATA_DIR, "data.pconn")
+METRICS_CONFIG = os.path.join(BASE_DIR, "config", "metrics_config.json")
+
 ICON_PATH = get_resource_path(os.path.join("src", "assets", "app_icon.ico"))
 SCHEDULER_ICON_PATH = get_resource_path(os.path.join("src", "assets", "schedule_icon.ico"))
 LOCK_FILE = os.path.join(os.getenv('TEMP', '.'), 'pytestconnection.lock')

@@ -7,6 +7,7 @@ from ..constants import LOG_DIR
 class AppLogger:
     _instance: Optional['AppLogger'] = None
     logger: logging.Logger
+    current_log_file: str = ""
     
     def __new__(cls) -> 'AppLogger':
         if cls._instance is None:
@@ -20,17 +21,22 @@ class AppLogger:
         
         # Nome único por execução: app_AAAAMMDD_HHMMSS.log
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_file = os.path.join(log_dir, f"app_{timestamp}.log")
+        self.current_log_file = os.path.join(log_dir, f"app_{timestamp}.log")
         
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s | %(levelname)s | %(message)s',
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler()
-            ]
-        )
+        # Base Logger
         self.logger = logging.getLogger("PyTestConnection")
+        self.logger.setLevel(logging.INFO)
+        
+        # Console Handler (Legível)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+        
+        # File Handler (Texto Puro)
+        file_handler = logging.FileHandler(self.current_log_file, encoding='utf-8')
+        file_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s'))
+        
+        self.logger.addHandler(console_handler)
+        self.logger.addHandler(file_handler)
  
     def info(self, msg: str) -> None:
         self.logger.info(msg)
