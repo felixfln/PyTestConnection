@@ -28,7 +28,12 @@ class QualityCalculator:
             try:
                 with open(abs_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except: pass
+            except Exception as e:
+                from .logger import logger
+                logger.error(f"Erro ao carregar métricas de {abs_path}: {e}")
+        else:
+            from .logger import logger
+            logger.error(f"Arquivo de configuração de métricas não encontrado: {abs_path}")
         return {"metrics": {}, "scenarios": {}}
 
     def calculate_score(self, results: Dict[str, Any]) -> int:

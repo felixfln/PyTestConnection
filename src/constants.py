@@ -16,7 +16,7 @@ else:
 DATA_DIR = os.path.join(BASE_DIR, "data")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 DATA_FILE = os.path.join(DATA_DIR, "data.pconn")
-METRICS_CONFIG = os.path.join(BASE_DIR, "config", "metrics_config.json")
+METRICS_CONFIG = get_resource_path(os.path.join("config", "metrics_config.json"))
 
 ICON_PATH = get_resource_path(os.path.join("src", "assets", "app_icon.ico"))
 SCHEDULER_ICON_PATH = get_resource_path(os.path.join("src", "assets", "schedule_icon.ico"))

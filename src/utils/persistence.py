@@ -92,17 +92,23 @@ class PersistenceManager:
                         
                         # Padroniza nomes para o Treeview (CapCase para compatibilidade com app.py)
                         # O app.py espera "Data", "Hora", etc.
+                        def safe_round(val: Any) -> float:
+                            try:
+                                return round(float(val), 2)
+                            except:
+                                return 0.0
+
                         compat_record = {
                             "Data": record.get("date", "--"),
                             "Hora": record.get("time", "--"),
-                            "Download": record.get("download", 0),
-                            "Upload": record.get("upload", 0),
-                            "Ping": record.get("ping", 0),
-                            "Jitter": record.get("jitter", 0),
+                            "Download": safe_round(record.get("download", 0)),
+                            "Upload": safe_round(record.get("upload", 0)),
+                            "Ping": safe_round(record.get("ping", 0)),
+                            "Jitter": safe_round(record.get("jitter", 0)),
                             "PerdaPacotes": record.get("packet_loss", "--"),
                             "Interface": record.get("interface", "--"),
                             "Conexão": record.get("connection_type", "--"),
-                            "Nota": record.get("grade", 0),
+                            "Nota": int(record.get("grade", 0)),
                             "IP": record.get("ip", "--"),
                             "Servidor": record.get("server", "--"),
                             "RedesSociais": record.get("social_media", 0),
