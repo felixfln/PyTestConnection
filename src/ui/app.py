@@ -4,14 +4,14 @@ import threading
 from datetime import datetime
 import os
 import sys
-from typing import Dict, Any, List, Optional, Callable, Union
+from typing import Dict, Any, List, Optional, Tuple, Callable, Union
 
 from ..engines.manager import EngineManager
 from ..utils.persistence import PersistenceManager
 from ..utils.calculator import QualityCalculator
 from ..utils.logger import logger
 from .components.graph import DynamicGraph
-from ..constants import COLORS, VERSION, APP_TITLE, WINDOW_SIZE, SEMAPHORE_COLORS
+from ..constants import COLORS, VERSION, APP_TITLE, WINDOW_SIZE, SEMAPHORE_COLORS, SCHEDULER_ICON_PATH
 
 
 # Módulo da Interface Principal
@@ -55,6 +55,7 @@ class InternetQualityApp:
     btn_schedule: tk.Button
     btn_clear: tk.Button
     tree: ttk.Treeview
+    table_cols: List[Tuple[str, str]]
     adequacy_items: Dict[str, tk.Label]
 
     def __init__(self, root: tk.Tk) -> None:
@@ -217,20 +218,30 @@ class InternetQualityApp:
             ind.pack(side=tk.RIGHT)
             self.adequacy_items[key] = ind
 
-        # Table
+        # Table with dedicated Scrollbar
+        history_frame = tk.Frame(self.main_container, bg=COLORS["bg"])
+        history_frame.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
+
         self.table_cols = [
             ("Data", "DATA"), ("Hora", "HORA"), ("Download", "DOWNLOAD"), 
             ("Upload", "UPLOAD"), ("Ping", "PING"), ("Jitter", "JITTER"), 
             ("PerdaPacotes", "PERDA"), ("Interface", "PROVEDOR"), ("Conexão", "CONEXÃO"), ("Nota", "NOTA")
         ]
         cols = [c[0] for c in self.table_cols]
-        self.tree = ttk.Treeview(self.main_container, columns=cols, show="headings", style="Treeview", height=8)
+        self.tree = ttk.Treeview(history_frame, columns=cols, show="headings", style="Treeview", height=8)
+        
+        # Scrollbar for Treeview
+        tree_scroll = ttk.Scrollbar(history_frame, orient="vertical", command=self.tree.yview, style="Vertical.TScrollbar")
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+        
+        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
         for col, head in self.table_cols:
             self.tree.heading(col, text=head)
             self.tree.column(col, width=90, anchor="center")
         self.tree.column("Interface", width=120)
         self.tree.column("Conexão", width=120)
-        self.tree.pack(fill=tk.BOTH, expand=True, pady=(20, 0))
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
 
     def _start_measurement(self, deep_test: bool = False, force_close_modal: bool = False) -> None:
@@ -468,6 +479,14 @@ class InternetQualityApp:
             
         self.schedule_modal = tk.Toplevel(self.root)
         self.schedule_modal.title("Configurar Agendamento")
+        
+        # Define o ícone da janela secundária
+        try:
+            if os.path.exists(SCHEDULER_ICON_PATH):
+                self.schedule_modal.iconbitmap(SCHEDULER_ICON_PATH)
+        except Exception as e:
+            logger.warning(f"Não foi possível carregar o ícone de agendamento: {e}")
+
         self.schedule_modal.geometry("350x450")
         self.schedule_modal.configure(bg=COLORS["bg"])
         self.schedule_modal.resizable(False, False)
