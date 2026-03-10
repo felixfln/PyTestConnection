@@ -132,6 +132,16 @@ class EngineManager:
             median_pings = [get_engine_median("ping", e) for e in engines_run]
             median_jitters = [get_engine_median("jitter", e) for e in engines_run]
             
+            # Acúmulo de perda de pacotes para o teste profundo
+            total_lost = sum(r.get("packets_lost", 0) for r in all_results if r.get("download", 0) > 0)
+            total_sent = sum(r.get("packets_sent", 0) for r in all_results if r.get("download", 0) > 0)
+            
+            if total_sent > 0:
+                loss_pct = (total_lost / total_sent) * 100
+                final_packet_loss = f"{total_lost}/{total_sent} ({int(loss_pct)}%)"
+            else:
+                final_packet_loss = "0/0 (0%)"
+
             valid_dls = [v for v in median_dls if v > 0]
             valid_uls = [v for v in median_uls if v > 0]
             valid_pings = [v for v in median_pings if v > 0]
@@ -142,6 +152,7 @@ class EngineManager:
                 "upload": max(valid_uls) if valid_uls else 0.0,
                 "ping": min(valid_pings) if valid_pings else 0.0,
                 "jitter": min(valid_jitters) if valid_jitters else 0.0,
+                "packet_loss": final_packet_loss,
                 "connection_type": connection_type,
                 # Campos de String: Busca de forma coesa a primeira válida ignorando "--" provindos de exceções de provedores falhos
                 "server": next((r["server"] for r in all_results if r.get("server") and r["server"] != "--"), "--"),

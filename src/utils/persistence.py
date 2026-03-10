@@ -52,7 +52,7 @@ class PersistenceManager:
             f"{record.get('upload', 0):.2f}",
             f"{record.get('ping', 0):.2f}",
             f"{record.get('jitter', 0):.2f}",
-            f"{record.get('packet_loss', 0):.2f}",
+            str(record.get('packet_loss', "0/10 (0%)")),
             str(record.get("server", "")),
             str(record.get("interface", "")),
             str(record.get("connection_type", "--")),
@@ -83,9 +83,13 @@ class PersistenceManager:
                 if not lines: return []
                 header = [h.strip() for h in lines[0].strip().split("|")]
                 for line in lines[1:]:
-                    values = [v.strip() for v in line.strip().split("|")]
+                    line_data = line.strip()
+                    if not line_data: continue
+                    values = [v.strip() for v in line_data.split("|")]
                     if len(values) == len(header):
                         records.append(dict(zip(header, values)))
+                    else:
+                        logger.warning(f"Ignorando registro inconsistente (colunas: {len(values)}/{len(header)}) na linha: {line_data[:30]}...")
         except Exception as e:
             logger.error(f"Erro ao carregar registros: {e}")
             return []

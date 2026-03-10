@@ -70,13 +70,23 @@ class SpeedtestEngine(BaseEngine):
                 callback("ping", ping)
                 callback("progress", 55)
 
-            # Jitter (Calculado logo após o ping como solicitado)
-            from ..utils.network import measure_jitter
+            # Qualidade de Rede (Jitter e Perda de Pacotes)
+            from ..utils.network import measure_network_quality
             server_host = results_init["server"]["host"]
-            if callback: callback("status", "Medindo estabilidade (Jitter)...")
-            jitter = measure_jitter(server_host)
+            if callback: callback("status", "Medindo estabilidade e perda de pacotes...")
+            net_quality = measure_network_quality(server_host)
+            
+            jitter = net_quality["jitter"]
+            packets_lost = net_quality["packets_lost"]
+            packets_sent = net_quality["packets_sent"]
+            
+            # Cálculo de porcentagem amigável
+            loss_pct = (packets_lost / packets_sent) * 100 if packets_sent > 0 else 0
+            packet_loss_str = f"{packets_lost}/{packets_sent} ({int(loss_pct)}%)"
+            
             if callback:
                 callback("jitter", jitter)
+                callback("packet_loss", packet_loss_str)
                 callback("progress", 65)
             
             # --- MEDIÇÃO DE DOWNLOAD COM MONITORAMENTO VIVO ---
@@ -119,6 +129,9 @@ class SpeedtestEngine(BaseEngine):
                 "upload": raw_upload,
                 "ping": ping,
                 "jitter": jitter,
+                "packet_loss": packet_loss_str,
+                "packets_lost": packets_lost,
+                "packets_sent": packets_sent,
                 "server": results["server"]["sponsor"],
                 "server_host": results["server"]["host"],
                 "ip": results["client"]["ip"],

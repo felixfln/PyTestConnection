@@ -4,38 +4,38 @@ import platform
 from typing import List
 from .logger import logger
 
-def measure_jitter(host: str) -> float:
-    """Calcula jitter baseado em pings reais (Variação média entre latências sucessivas)"""
+def measure_network_quality(host: str) -> dict:
+    """Calcula jitter e perda de pacotes baseada em 10 pings reais."""
     latencies: List[float] = []
+    packets_sent = 10
     try:
-        # Remove porta do host se houver (ex: host.com:8080 -> host.com)
         clean_host = host.split(":")[0]
-        
         param = "-n" if platform.system().lower() == "windows" else "-c"
-        # 8 pings para uma amostragem melhor sem demorar muito
-        command = ["ping", param, "8", clean_host]
+        # 10 pings para precisão conforme solicitado
+        command = ["ping", param, str(packets_sent), clean_host]
         
-        # Executa ping ocultando janela no Windows
         flags = 0x08000000 if platform.system() == "Windows" else 0
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=flags)
         stdout, stderr = process.communicate()
         
-        if process.returncode != 0:
-            logger.warning(f"Comando ping retornou erro {process.returncode} para {clean_host}: {stderr}")
-            return 0.0
-
-        # Regex aprimorado para capturar latência em PT e EN
+        # O número de pings respondidos é a contagem de latências encontradas
         matches = re.findall(r"(?:tempo|time)[=<]\s*(\d+\.?\d*)", stdout, re.IGNORECASE)
         latencies = [float(m) for m in matches]
         
-        if len(latencies) < 2:
-            return 0.0
-            
-        # Jitter = Média das diferenças absolutas entre pings consecutivos
-        diffs = [abs(latencies[i] - latencies[i-1]) for i in range(1, len(latencies))]
-        jitter = sum(diffs) / len(diffs)
-        return float(int(jitter * 100) / 100.0)
+        packets_lost = packets_sent - len(latencies)
+        
+        jitter = 0.0
+        if len(latencies) >= 2:
+            diffs = [abs(latencies[i] - latencies[i-1]) for i in range(1, len(latencies))]
+            jitter = sum(diffs) / len(diffs)
+            jitter = float(int(jitter * 100) / 100.0)
+
+        return {
+            "jitter": jitter,
+            "packets_sent": packets_sent,
+            "packets_lost": packets_lost
+        }
         
     except Exception as e:
-        logger.error(f"Exceção durante cálculo de jitter: {e}")
-        return 0.0
+        logger.error(f"Exceção durante cálculo de qualidade de rede: {e}")
+        return {"jitter": 0.0, "packets_sent": packets_sent, "packets_lost": packets_sent}

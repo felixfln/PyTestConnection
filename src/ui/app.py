@@ -44,6 +44,7 @@ class InternetQualityApp:
     lbl_upload: tk.Label
     lbl_ping: tk.Label
     lbl_jitter: tk.Label
+    lbl_packet_loss: tk.Label
     lbl_grade: tk.Label
     lbl_interface: tk.Label
     lbl_connection_type: tk.Label
@@ -166,7 +167,9 @@ class InternetQualityApp:
         self.lbl_ping = tk.Label(latency, text="Ping: -- ms", bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12))
         self.lbl_ping.pack(side=tk.LEFT, padx=(0, 30))
         self.lbl_jitter = tk.Label(latency, text="Jitter: -- ms", bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12))
-        self.lbl_jitter.pack(side=tk.LEFT)
+        self.lbl_jitter.pack(side=tk.LEFT, padx=(0, 30))
+        self.lbl_packet_loss = tk.Label(latency, text="Perda: --", bg=COLORS["card"], fg=COLORS["text"], font=("Segoe UI", 12))
+        self.lbl_packet_loss.pack(side=tk.LEFT)
 
         # Right Side (Grade & Extra Info)
         right = tk.Frame(card, bg=COLORS["card"])
@@ -218,7 +221,7 @@ class InternetQualityApp:
         self.table_cols = [
             ("Data", "DATA"), ("Hora", "HORA"), ("Download", "DOWNLOAD"), 
             ("Upload", "UPLOAD"), ("Ping", "PING"), ("Jitter", "JITTER"), 
-            ("Interface", "PROVEDOR"), ("Conexão", "CONEXÃO"), ("Nota", "NOTA")
+            ("PerdaPacotes", "PERDA"), ("Interface", "PROVEDOR"), ("Conexão", "CONEXÃO"), ("Nota", "NOTA")
         ]
         cols = [c[0] for c in self.table_cols]
         self.tree = ttk.Treeview(self.main_container, columns=cols, show="headings", style="Treeview", height=8)
@@ -260,6 +263,7 @@ class InternetQualityApp:
                     self.root.after(0, lambda: self.lbl_upload.config(text=f"{val:.2f} Mbps"))
                 elif m_type == "ping": self.root.after(0, lambda: self.lbl_ping.config(text=f"Ping: {val:.2f} ms"))
                 elif m_type == "jitter": self.root.after(0, lambda: self.lbl_jitter.config(text=f"Jitter: {val:.2f} ms"))
+                elif m_type == "packet_loss": self.root.after(0, lambda: self.lbl_packet_loss.config(text=f"Perda: {val}"))
                 elif m_type == "connection_type": self.root.after(0, lambda: self.lbl_connection_type.config(text=f"CONEXÃO: {val}"))
                 elif m_type == "interface": self.root.after(0, lambda: self.lbl_interface.config(text=f"ISP: {val}"))
                 elif m_type == "ip": self.root.after(0, lambda: self._update_ip_server(ip=val))
@@ -286,6 +290,7 @@ class InternetQualityApp:
                 "date": now.strftime("%d/%m/%Y"), "time": now.strftime("%H:%M:%S"),
                 "download": results["download"], "upload": results["upload"],
                 "ping": results["ping"], "jitter": results.get("jitter", 0),
+                "packet_loss": results.get("packet_loss", "0/10 (0%)"),
                 "server": results["server"], "interface": results.get("interface", "--"),
                 "connection_type": results.get("connection_type", "--"),
                 "ip": results.get("ip", "--"), "grade": score, **scenarios
@@ -321,6 +326,9 @@ class InternetQualityApp:
         jit = res.get('jitter', 0)
         self.lbl_jitter.config(text=f"Jitter: {jit:.2f} ms" if jit > 0 else "Jitter: --")
         
+        loss = res.get('packet_loss', '--')
+        self.lbl_packet_loss.config(text=f"Perda: {loss}")
+        
         self.lbl_grade.config(text=str(score), fg=color)
         self.lbl_interface.config(text=f"STATUS: {text} | ISP: {res.get('interface', '--')}", fg=color)
         self.lbl_connection_type.config(text=f"CONEXÃO: {res.get('connection_type', '--')}")
@@ -351,6 +359,7 @@ class InternetQualityApp:
         self.lbl_upload.config(text=f"{res['upload']:.2f} Mbps")
         self.lbl_ping.config(text=f"Ping: {res['ping']:.2f} ms")
         self.lbl_jitter.config(text=f"Jitter: {res.get('jitter', 0):.2f} ms")
+        self.lbl_packet_loss.config(text=f"Perda: {res.get('packet_loss', '--')}")
         self.lbl_grade.config(text=str(score), fg=color)
         self.lbl_interface.config(text=f"STATUS: {text} | ISP: {res.get('interface', '--')}", fg=color)
         self.lbl_connection_type.config(text=f"CONEXÃO: {res.get('connection_type', '--')}")
@@ -379,6 +388,7 @@ class InternetQualityApp:
             res = {
                 "download": float(r.get("Download", 0)), "upload": float(r.get("Upload", 0)),
                 "ping": float(r.get("Ping", 0)), "jitter": float(r.get("Jitter", 0)),
+                "packet_loss": r.get("PerdaPacotes", "--"),
                 "ip": r.get("IP", "--"), "server": r.get("Servidor", "--"), 
                 "interface": r.get("Interface", "--"), "connection_type": r.get("Conexão", "--")
             }
@@ -399,6 +409,7 @@ class InternetQualityApp:
         self.lbl_upload.config(text="-- Mbps")
         self.lbl_ping.config(text="Ping: -- ms")
         self.lbl_jitter.config(text="Jitter: -- ms")
+        self.lbl_packet_loss.config(text="Perda: --")
         self.lbl_grade.config(text="--")
         self.lbl_interface.config(text="Interface: --")
         self.lbl_connection_type.config(text="Conexão: --")

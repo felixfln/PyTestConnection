@@ -58,11 +58,21 @@ class CloudflareEngine(BaseEngine):
             if callback:
                 callback("ping", ping)
                 callback("progress", 30)
-                callback("status", "Medindo estabilidade (Jitter)...")
+                callback("status", "Medindo estabilidade e perda de pacotes...")
                 
-            jitter = measure_jitter(ping_host)
+            from ..utils.network import measure_network_quality
+            net_q = measure_network_quality(ping_host)
+            jitter = net_q["jitter"]
+            packets_lost = net_q["packets_lost"]
+            packets_sent = net_q["packets_sent"]
+            
+            # Cálculo de porcentagem amigável
+            loss_pct = (packets_lost / packets_sent) * 100 if packets_sent > 0 else 0
+            packet_loss_str = f"{packets_lost}/{packets_sent} ({int(loss_pct)}%)"
+
             if callback:
                 callback("jitter", jitter)
+                callback("packet_loss", packet_loss_str)
                 callback("progress", 40)
             
             if callback: callback("status", "Medindo velocidade de DOWNLOAD...")
@@ -116,6 +126,9 @@ class CloudflareEngine(BaseEngine):
                 "upload": upload_mbps,
                 "ping": ping,
                 "jitter": jitter,
+                "packet_loss": packet_loss_str,
+                "packets_lost": packets_lost,
+                "packets_sent": packets_sent,
                 "server": f"Cloudflare {server_colo}",
                 "server_host": ping_host,
                 "ip": client_ip,
