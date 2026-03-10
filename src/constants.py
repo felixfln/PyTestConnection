@@ -1,12 +1,15 @@
 import os
 import sys
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
-# Caminhos de Arquivos
+from src.utils.resource_manager import get_resource_path
+
+# Caminhos de Arquivos e Recursos
 DATA_FILE = "data/data.txt"
 METRICS_CONFIG = "config/metrics_config.json"
 LOG_DIR = "logs"
+ICON_PATH = get_resource_path(os.path.join("src", "assets", "app_icon.ico"))
 LOCK_FILE = os.path.join(os.getenv('TEMP', '.'), 'pytestconnection.lock')
 
 # Paleta de Cores Premium (Sincronizada com app.py)
