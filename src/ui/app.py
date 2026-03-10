@@ -279,6 +279,7 @@ class InternetQualityApp:
         self.btn_deep_measure.config(state="disabled")
         self.btn_schedule.config(state="disabled")
         self.btn_clear.config(state="disabled")
+        self.btn_logs.config(state="disabled")
         self.is_measuring = True
         self.progress['value'] = 0
         status_text = "Avaliando conexão (Teste Profundo)..." if deep_test else "Avaliando conexão..."
@@ -459,6 +460,9 @@ class InternetQualityApp:
 
     def _view_logs(self):
         """Abre seletor para escolher qual log visualizar diretamente."""
+        if self.is_measuring:
+            return
+            
         from ..constants import LOG_DIR
 
         # Abre o diálogo padrão do Windows para selecionar o arquivo .log
@@ -520,6 +524,9 @@ class InternetQualityApp:
             self.next_run = self._calculate_next_run(datetime.now(), self.schedule_interval, self.schedule_unit)
 
     def _open_schedule_modal(self) -> None:
+        if self.is_measuring:
+            return
+            
         if self.schedule_modal and self.schedule_modal.winfo_exists():
             self.schedule_modal.focus_set()
             return
