@@ -1,7 +1,7 @@
 import os
 import sys
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 from src.utils.resource_manager import get_resource_path
 
