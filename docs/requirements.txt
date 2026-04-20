@@ -1,0 +1,6 @@
+speedtest-cli
+requests
+matplotlib
+pyinstaller
+psutil
+Pillow
